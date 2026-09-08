@@ -79,7 +79,30 @@ function load(){
     {id:3,title:'قبض برق را پرداخت کنم',c:7,p:0,s:1,date:addDays(t,-2),done:false},
   ];
 }
+/* merge duplicates left over from the old repeat logic: one series per repeating task */
+function mergeSeries(tasks){
+  const seen={},out=[];
+  (tasks||[]).forEach(t=>{
+    if(!t.rep){out.push(t);return}
+    const k=[t.title,t.rep,t.c,t.s,t.p,t.time||''].join('|');
+    if(!seen[k]){
+      const m=Object.assign({},t);
+      m.doneOn=Object.assign({},t.doneOn||{});
+      if(t.done)m.doneOn[t.date]=1;
+      m.done=false;
+      seen[k]=m;out.push(m);
+    }else{
+      const m=seen[k];
+      if(t.date<m.date)m.date=t.date;
+      Object.assign(m.doneOn,t.doneOn||{});
+      if(t.done)m.doneOn[t.date]=1;
+    }
+  });
+  return out;
+}
 S.tasks=load();
+{const before=S.tasks.length;S.tasks=mergeSeries(S.tasks);
+ if(S.tasks.length!==before)try{localStorage.setItem(KEY,JSON.stringify({tasks:S.tasks}))}catch(e){}}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({tasks:S.tasks}))}catch(e){}};
 
 /* ================= classify ================= */
