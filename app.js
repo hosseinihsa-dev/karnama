@@ -35,7 +35,7 @@ const jdate=s=>jf?jf.format(fromIso(s)):s;
 
 /* ================= state ================= */
 const KEY='karnama.v1';
-let S={tab:0,sort:0,day:TODAY(),sheet:false,pv:null,tasks:null};
+let S={tab:0,sort:0,day:TODAY(),sheet:false,pv:null,edit:null,tasks:null};
 function load(){
   try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&Array.isArray(r.tasks))return r.tasks}catch(e){}
   const t=TODAY();
@@ -117,6 +117,7 @@ function render(){
     el.onclick=()=>{
       const id=+el.dataset.id,a=el.dataset.act;
       if(a==='toggle')toggle(id);
+      else if(a==='edit')openSheet(id);
       else if(a==='today')patch(id,{date:TODAY()});
       else if(a==='tomorrow')patch(id,{date:addDays(TODAY(),1),moved:(byId(id).moved||0)+1});
       else if(a==='done')patch(id,{date:TODAY(),done:true});
@@ -138,7 +139,7 @@ function todayView(overdue,list,doneN,today){
     overdue.forEach(t=>{
       const late=diffDays(today,t.date);
       h+=`<div class="ov-item"><div class="ov-row"><span class="dot" style="background:${col(CATS[t.c].h)}"></span>
-        <span class="ov-name">${esc(t.title)}</span><span class="ov-late">${fa(late)} روز عقب</span></div>`;
+        <span class="ov-name" data-act="edit" data-id="${t.id}">${esc(t.title)}</span><span class="ov-late">${fa(late)} روز عقب</span></div>`;
       if((t.moved||0)>=3||late>=3)h+=`<div class="ov-nudge">سه بار جابه‌جا شده. یا به دو کار کوچک‌تر بشکنش، یا رهایش کن.</div>`;
       h+=`<div class="ov-acts">
         <button class="b-gold" data-act="today" data-id="${t.id}">امروز</button>
@@ -169,7 +170,7 @@ function todayView(overdue,list,doneN,today){
       lh+=`<div class="ghead"><b>${gk(t)}</b><i></i><span>${fa(gc[gk(t)])} کار</span></div>`;
     lh+=`<div class="task">
       <button class="box ${t.done?'on':''}" data-act="toggle" data-id="${t.id}">${t.done?'✓':''}</button>
-      <div class="tmid"><div class="ttl ${t.done?'done':''}">${esc(t.title)}</div><div class="chips">${taskChips(t)}</div></div>
+      <div class="tmid"><div class="ttl ${t.done?'done':''}" data-act="edit" data-id="${t.id}">${esc(t.title)}</div><div class="chips">${taskChips(t)}</div></div>
       <button class="tdel" data-act="del" data-id="${t.id}">×</button>
       <span class="rank">${fa(String(i+1).padStart(2,'0'))}</span></div>`;
   });
@@ -195,7 +196,7 @@ function weekView(){
   h+=`<div class="dayhead">${fa(WD[wdIndex(S.day)]+' '+jdate(S.day))} — ${fa(dt.length)} کار</div>`;
   if(!dt.length)h+='<div class="empty">این روز خالیه. یک روز آزاد هم لازمه.</div>';
   else h+='<div class="list">'+dt.map(t=>`<div class="drow"><span class="acc" style="background:${col(CATS[t.c].h)}"></span>
-    <div style="flex:1;min-width:0"><div class="t">${esc(t.title)}</div>
+    <div style="flex:1;min-width:0" data-act="edit" data-id="${t.id}"><div class="t">${esc(t.title)}</div>
     <div class="m">${CATS[t.c].name} · ${SLOTS[t.s]} · ${PRI[t.p]}${t.rep?' · '+t.rep:''}</div></div>
     <button class="tdel" data-act="del" data-id="${t.id}">×</button></div>`).join('')+'</div>';
   return h;
@@ -214,9 +215,18 @@ function catView(){
 const ov=document.getElementById('ov'),dr=document.getElementById('draft'),
       pv=document.getElementById('prev'),pc=document.getElementById('pvchips'),sb=document.getElementById('submit');
 
-function openSheet(){S.pv=null;dr.value='';updatePv();ov.classList.add('show');setTimeout(()=>dr.focus(),60)}
+function openSheet(id){
+  const t=id?byId(id):null;
+  S.edit=t?t.id:null;
+  document.getElementById('sh-title').textContent=t?'ویرایش کار':'چی تو ذهنته؟';
+  sb.textContent=t?'ذخیره‌ی تغییرات':'بسپار به کارنما';
+  document.getElementById('sh-del').style.display=t?'block':'none';
+  if(t){dr.value=t.title;S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,date:t.date,locked:true}}
+  else {dr.value='';S.pv=null}
+  updatePv();ov.classList.add('show');setTimeout(()=>dr.focus(),60);
+}
 function closeSheet(){ov.classList.remove('show');dr.blur()}
-document.getElementById('fab').onclick=openSheet;
+document.getElementById('fab').onclick=()=>openSheet();
 document.getElementById('scrim').onclick=closeSheet;
 
 function updatePv(){
@@ -262,11 +272,23 @@ function picker(f){
 sb.onclick=()=>{
   const txt=dr.value.trim();if(!txt)return;
   const g=S.pv&&S.pv.locked?S.pv:classify(txt);
-  S.tasks.push({id:Date.now(),title:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,rem:g.p===0});
-  save();closeSheet();S.tab=0;S.day=g.date;S.pv=null;dr.value='';render();
   const today=TODAY();
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
+  if(S.edit){
+    const t=byId(S.edit);
+    if(t)Object.assign(t,{title:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null});
+    save();closeSheet();S.day=g.date;S.pv=null;S.edit=null;dr.value='';render();
+    toast('تغییرات ذخیره شد.',2600);
+    return;
+  }
+  S.tasks.push({id:Date.now(),title:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,rem:g.p===0});
+  save();closeSheet();S.tab=0;S.day=g.date;S.pv=null;dr.value='';render();
   toast(`اضافه شد به «${CATS[g.c].name}» · ${PRI[g.p]} · پیشنهاد: ${dl} ${SLOTS[g.s]}`);
+};
+
+document.getElementById('sh-del').onclick=()=>{
+  if(!S.edit)return;
+  remove(S.edit);S.edit=null;closeSheet();toast('کار حذف شد.',2600);
 };
 
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===1)S.day=TODAY();render()});
