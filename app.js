@@ -42,11 +42,13 @@ const jparts=(()=>{
     return s=>{const d=fromIso(s);return{y:d.getFullYear(),m:d.getMonth()+1,d:d.getDate()}};
   }
 })();
+const endOfJMonth=d=>{let x=d,m=jparts(d).m;for(let i=0;i<32;i++){const n=addDays(x,1);if(jparts(n).m!==m)break;x=n}return x};
 
 /* ---- recurrence: a repeating task is one series that shows on every matching day ---- */
 function occursOn(t,d){
   if(!t.rep)return t.date===d;
   if(d<t.date)return false;
+  if(t.until&&d>t.until)return false;
   if(t.rep==='هر روز')return true;
   if(t.rep==='هر هفته')return diffDays(d,t.date)%7===0;
   if(t.rep==='هر ماه')return jparts(d).d===jparts(t.date).d;
@@ -84,7 +86,7 @@ function mergeSeries(tasks){
   const seen={},out=[];
   (tasks||[]).forEach(t=>{
     if(!t.rep){out.push(t);return}
-    const k=[t.title,t.rep,t.c,t.s,t.p,t.time||''].join('|');
+    const k=[t.title,t.rep,t.c,t.s,t.p,t.time||'',t.until||''].join('|');
     if(!seen[k]){
       const m=Object.assign({},t);
       m.doneOn=Object.assign({},t.doneOn||{});
@@ -142,7 +144,17 @@ function classify(text){
       }
     }
   }
-  return {c,s,p,rep,date,time};
+  let until=null;
+  if(rep){
+    if(/تا\s*(آخر|پایان)\s*(این\s*)?ماه/.test(t))until=endOfJMonth(today);
+    else if(/تا\s*(آخر|پایان)\s*(این\s*)?هفته/.test(t))until=addDays(weekStart(today),6);
+    else{
+      const um=t.match(/تا\s*([\d۰-۹]{1,3})\s*(روز|هفته|ماه)/);
+      if(um){const n=parseInt(en(um[1]),10)||0;
+        if(n>0)until=addDays(today,um[2]==='روز'?n:um[2]==='هفته'?n*7:n*30);}
+    }
+  }
+  return {c,s,p,rep,date,time,until};
 }
 
 /* ---- turn a free description into a short title ---- */
@@ -159,6 +171,8 @@ function titleFrom(text){
   T_KILL.forEach(r=>{t=t.replace(r,'')});
   t=t.replace(/ساعت\s*[\d۰-۹]+([:.٫][\d۰-۹]+)?/g,' ');
   t=t.replace(/\b[\d۰-۹]{1,2}[:٫][\d۰-۹]{2}\b/g,' ');
+  t=t.replace(/تا\s*(آخر|پایان)\s*(این\s*)?(ماه|هفته)/g,' ');
+  t=t.replace(/تا\s*[\d۰-۹]{1,3}\s*(روز|هفته|ماه)\s*(دیگه|بعد|آینده)?/g,' ');
   T_WORDS.slice().sort((a,b)=>b.length-a.length).forEach(w=>{t=t.split(w).join(' ')});
   t=t.replace(/\s+/g,' ').replace(/^[\s,،.\-–—]+|[\s,،.\-–—]+$/g,'');
   t=t.replace(/^(که|را|رو|در|به|از)\s+/,'');
@@ -172,7 +186,7 @@ function titleFrom(text){
 const catChip=t=>`<span class="chip" style="color:${col(CATS[t.c].h)};background:${col(CATS[t.c].h,.13)}"><span class="d5" style="background:${col(CATS[t.c].h)}"></span>${CATS[t.c].name}</span>`;
 function taskChips(t){
   let h=catChip(t)+`<span class="chip c-nu">${t.time?fa(t.time):SLOTS[t.s]}</span>`;
-  if(t.rep)h+=`<span class="chip c-inf">${t.rep}</span>`;
+  if(t.rep)h+=`<span class="chip c-inf">${t.rep}${t.until?' تا '+fa(jdate(t.until)):''}</span>`;
   if(t.rem)h+=`<span class="chip c-rem">یادآور</span>`;
   return h;
 }
@@ -354,7 +368,7 @@ function openSheet(id){
   document.getElementById('sh-title').textContent=t?'ویرایش کار':'چی تو ذهنته؟';
   sb.textContent=t?'ذخیره‌ی تغییرات':'بسپار به کارنما';
   document.getElementById('sh-del').style.display=t?'block':'none';
-  if(t){dr.value=t.note||t.title;S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,date:t.date,time:t.time||null,title:t.title,locked:true}}
+  if(t){dr.value=t.note||t.title;S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,until:t.until||null,date:t.date,time:t.time||null,title:t.title,locked:true}}
   else {dr.value='';S.pv=null}
   updatePv();ov.classList.add('show');setTimeout(()=>dr.focus(),60);
 }
@@ -376,7 +390,8 @@ function updatePv(){
     `<button class="chip c-nu" data-f="s">${SLOTS[g.s]}</button>`+
     `<button class="chip c-nu" data-f="time">${g.time?fa(g.time):'بدون ساعت'}</button>`+
     `<button class="chip c-nu" data-f="p">${PRI[g.p]}</button>`+
-    `<button class="chip c-inf" data-f="rep">${g.rep||'بدون تکرار'}</button>`;
+    `<button class="chip c-inf" data-f="rep">${g.rep||'بدون تکرار'}</button>`+
+    (g.rep?`<button class="chip c-inf" data-f="until">${g.until?'تا '+fa(jdate(g.until)):'بدون پایان'}</button>`:'');
   pc.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>picker(b.dataset.f));
   const tl=document.getElementById('pv-title');
   tl.innerHTML=`<span>عنوان: </span><b>${esc(S.pv.title||titleFrom(txt))}</b><i>ویرایش</i>`;
@@ -398,6 +413,15 @@ function picker(f){
   else if(f==='s'){title='زمان روز';opts=SLOTS.map((s,i)=>({v:i,l:s,on:i===g.s}))}
   else if(f==='p'){title='اولویت';opts=PRI.map((s,i)=>({v:i,l:s,on:i===g.p}))}
   else if(f==='rep'){title='تکرار';opts=REPS.map((r,i)=>({v:i,l:r||'بدون تکرار',on:(g.rep||null)===r}))}
+  else if(f==='until'){title='تکرار تا کِی؟';
+        opts=[{v:'',l:'بدون پایان — همیشه تکرار شود',on:!g.until},
+              {v:addDays(today,-1),l:'تمام شد — از امروز دیگر تکرار نشود',on:g.until===addDays(today,-1)},
+              {v:addDays(weekStart(today),6),l:'تا آخر این هفته',on:g.until===addDays(weekStart(today),6)},
+              {v:addDays(today,14),l:'تا دو هفته دیگر',on:g.until===addDays(today,14)},
+              {v:endOfJMonth(today),l:'تا آخر این ماه',on:g.until===endOfJMonth(today)},
+              {v:addDays(today,90),l:'تا سه ماه دیگر',on:g.until===addDays(today,90)}];
+        for(let i=1;i<=60;i++){const d=addDays(today,i);
+          opts.push({v:d,l:'تا '+fa(WD[wdIndex(d)]+' '+jdate(d)),on:g.until===d})}}
   else if(f==='time'){title='ساعت';opts=[{v:'',l:'بدون ساعت',on:!g.time}];
         for(let hh=6;hh<=23;hh++)for(const mm of ['00','30']){const v=hh+':'+mm;opts.push({v:v,l:fa(v),on:g.time===v})}}
   else{title='روز';opts=[];for(let i=0;i<15;i++){const d=addDays(today,i);
@@ -407,6 +431,7 @@ function picker(f){
   pkbx.querySelectorAll('.op').forEach((b,i)=>b.onclick=()=>{
     const val=opts[i].v;
     if(f==='rep')g.rep=REPS[val];
+    else if(f==='until')g.until=val||null;
     else if(f==='time'){g.time=val||null;if(val){const hh=+val.split(':')[0];g.s=hh<12?0:(hh<18?1:2)}}
     else g[f]=val;
     g.locked=true;pk.classList.remove('show');updatePv();
@@ -421,14 +446,14 @@ sb.onclick=()=>{
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
   if(S.edit){
     const t=byId(S.edit);
-    if(t)Object.assign(t,{title:g.title||titleFrom(txt),note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,time:g.time||null});
+    if(t)Object.assign(t,{title:g.title||titleFrom(txt),note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null});
     save();closeSheet();S.day=g.date;S.pv=null;S.edit=null;dr.value='';render();
     toast('تغییرات ذخیره شد.',2600);
     return;
   }
-  S.tasks.push({id:Date.now(),title:g.title||titleFrom(txt),note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,time:g.time||null,rem:g.p===0});
+  S.tasks.push({id:Date.now(),title:g.title||titleFrom(txt),note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0});
   save();closeSheet();S.tab=g.date===addDays(today,1)?1:0;S.day=g.date;S.pv=null;dr.value='';render();
-  toast(`اضافه شد به «${CATS[g.c].name}»${g.rep?' · '+g.rep:''} · پیشنهاد: ${dl} ${g.time?fa(g.time):SLOTS[g.s]}`);
+  toast(`اضافه شد به «${CATS[g.c].name}»${g.rep?' · '+g.rep+(g.until?' تا '+fa(jdate(g.until)):''):''} · پیشنهاد: ${dl} ${g.time?fa(g.time):SLOTS[g.s]}`);
 };
 
 document.getElementById('sh-del').onclick=()=>{
