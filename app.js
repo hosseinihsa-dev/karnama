@@ -103,6 +103,13 @@ function toggle(id){
 }
 function remove(id){S.tasks=S.tasks.filter(t=>t.id!==id);save();render()}
 
+function taskCard(t,i){
+  return `<div class="task">
+      <button class="box ${t.done?'on':''}" data-act="toggle" data-id="${t.id}">${t.done?'✓':''}</button>
+      <div class="tmid"><div class="ttl ${t.done?'done':''}" data-act="edit" data-id="${t.id}">${esc(t.title)}</div><div class="chips">${taskChips(t)}</div></div>
+      <span class="rank">${fa(String(i+1).padStart(2,'0'))}</span></div>`;
+}
+
 /* ================= render ================= */
 function render(){
   const today=TODAY();
@@ -112,7 +119,7 @@ function render(){
   document.getElementById('sub').textContent=fa(`${WD[wdIndex(today)]} ${jdate(today)} · ${list.length} کار برای امروز · ${doneN} انجام شده`);
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',+b.dataset.tab===S.tab));
   const v=document.getElementById('view');
-  v.innerHTML=[todayView,weekView,catView][S.tab](overdue,list,doneN,today);
+  v.innerHTML=[todayView,tomorrowView,weekView,catView][S.tab](overdue,list,doneN,today);
   v.querySelectorAll('[data-act]').forEach(el=>{
     el.onclick=()=>{
       const id=+el.dataset.id,a=el.dataset.act;
@@ -167,16 +174,23 @@ function todayView(overdue,list,doneN,today){
   sorted.forEach((t,i)=>{
     if(S.sort!==0&&(i===0||gk(sorted[i-1])!==gk(t)))
       lh+=`<div class="ghead"><b>${gk(t)}</b><i></i><span>${fa(gc[gk(t)])} کار</span></div>`;
-    lh+=`<div class="task">
-      <button class="box ${t.done?'on':''}" data-act="toggle" data-id="${t.id}">${t.done?'✓':''}</button>
-      <div class="tmid"><div class="ttl ${t.done?'done':''}" data-act="edit" data-id="${t.id}">${esc(t.title)}</div><div class="chips">${taskChips(t)}</div></div>
-      <span class="rank">${fa(String(i+1).padStart(2,'0'))}</span></div>`;
+    lh+=taskCard(t,i);
   });
   h+=`<div class="list">${lh||'<div class="empty">امروز کاری ثبت نشده. با دکمه‌ی + شروع کن.</div>'}</div>`;
   const next=sorted.find(t=>!t.done);
   h+=`<div class="sugg"><b>پیشنهاد کارنما: </b>${next
     ?`الان بهترین وقت برای «${esc(next.title)}» است — ${SLOTS[next.s]} و ${PRI[next.p]}.`
     :'کار باقی‌مانده‌ای نداری؛ یک کار از هفته را جلو بیانداز.'}</div>`;
+  return h;
+}
+
+function tomorrowView(){
+  const d=addDays(TODAY(),1);
+  const list=S.tasks.filter(t=>t.date===d);
+  const sorted=[...list].sort((a,b)=>(a.done-b.done)||(a.p-b.p)||(a.s-b.s));
+  let h=`<div class="dayhead">فردا — ${fa(WD[wdIndex(d)]+' '+jdate(d))} · ${fa(list.length)} کار</div>`;
+  h+=`<div class="list">${sorted.map((t,i)=>taskCard(t,i)).join('')||'<div class="empty">فردا هنوز خالی است. با دکمه‌ی + چیزی برایش بگذار.</div>'}</div>`;
+  if(sorted.length)h+=`<div class="sugg"><b>یادت باشد: </b>کارهای فردا را می‌توانی همین حالا هم انجام بدهی — روی متن هر کار بزن و روزش را به امروز عوض کن.</div>`;
   return h;
 }
 
@@ -279,7 +293,7 @@ sb.onclick=()=>{
     return;
   }
   S.tasks.push({id:Date.now(),title:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,rem:g.p===0});
-  save();closeSheet();S.tab=0;S.day=g.date;S.pv=null;dr.value='';render();
+  save();closeSheet();S.tab=g.date===addDays(today,1)?1:0;S.day=g.date;S.pv=null;dr.value='';render();
   toast(`اضافه شد به «${CATS[g.c].name}» · ${PRI[g.p]} · پیشنهاد: ${dl} ${SLOTS[g.s]}`);
 };
 
@@ -288,7 +302,7 @@ document.getElementById('sh-del').onclick=()=>{
   remove(S.edit);S.edit=null;closeSheet();toast('کار حذف شد.',2600);
 };
 
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===1)S.day=TODAY();render()});
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===2)S.day=TODAY();render()});
 
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
 
