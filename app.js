@@ -386,7 +386,10 @@ function openSheet(id){
   document.getElementById('sh-title').textContent=t?'ویرایش کار':'چی تو ذهنته؟';
   sb.textContent=t?'ذخیره‌ی تغییرات':'بسپار به کارنما';
   document.getElementById('sh-del').style.display=t?'block':'none';
-  if(t){dr.value=t.note||t.title;S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,until:t.until||null,date:t.date,time:t.time||null,title:t.title,locked:true}}
+  if(t){dr.value=t.note||t.title;
+    const auto=titleFrom(t.note||t.title);
+    S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,until:t.until||null,date:t.date,time:t.time||null,
+          title:t.title,titleManual:t.title!==auto,touched:true};}
   else {dr.value='';S.pv=null}
   updatePv();ov.classList.add('show');setTimeout(()=>dr.focus(),60);
 }
@@ -398,7 +401,11 @@ function updatePv(){
   const txt=dr.value.trim();
   sb.classList.toggle('on',txt.length>0);
   if(txt.length<=2&&!S.pv){pv.classList.remove('show');S.pv=null;return}
-  if(!S.pv||!S.pv.locked)S.pv=Object.assign({locked:false},classify(txt));
+  if(!S.pv)S.pv=Object.assign({touched:false,titleManual:false},classify(txt));
+  else if(!S.pv.touched&&!S.edit){
+    const keep=S.pv.titleManual?S.pv.title:null;
+    S.pv=Object.assign({touched:false,titleManual:!!keep,title:keep},classify(txt));
+  }
   pv.classList.add('show');
   const g=S.pv,today=TODAY();
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
@@ -412,14 +419,14 @@ function updatePv(){
     (g.rep?`<button class="chip c-inf" data-f="until">${g.until?'تا '+fa(jdate(g.until)):'بدون پایان'}</button>`:'');
   pc.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>picker(b.dataset.f));
   const tl=document.getElementById('pv-title');
-  tl.innerHTML=`<span>عنوان: </span><b>${esc(S.pv.title||titleFrom(txt))}</b><i>ویرایش</i>`;
+  tl.innerHTML=`<span>عنوان: </span><b>${esc(S.pv.titleManual&&S.pv.title?S.pv.title:titleFrom(txt))}</b><i>ویرایش</i>`;
   tl.onclick=()=>{
-    const cur=S.pv.title||titleFrom(dr.value.trim());
+    const cur=S.pv.titleManual&&S.pv.title?S.pv.title:titleFrom(dr.value.trim());
     const v=prompt('عنوان کار:',cur);
-    if(v&&v.trim()){S.pv.title=v.trim();S.pv.locked=true;updatePv()}
+    if(v&&v.trim()){S.pv.title=v.trim();S.pv.titleManual=true;S.pv.touched=true;updatePv()}
   };
 }
-dr.addEventListener('input',()=>{if(S.pv){S.pv.locked=false;S.pv.title=null}updatePv()});
+dr.addEventListener('input',()=>updatePv());
 
 /* --- picker --- */
 const pk=document.getElementById('pick'),pkbx=pk.querySelector('.bx');
@@ -452,24 +459,25 @@ function picker(f){
     else if(f==='until')g.until=val||null;
     else if(f==='time'){g.time=val||null;if(val){const hh=+val.split(':')[0];g.s=hh<12?0:(hh<18?1:2)}}
     else g[f]=val;
-    g.locked=true;pk.classList.remove('show');updatePv();
+    g.touched=true;pk.classList.remove('show');updatePv();
   });
   pk.classList.add('show');
 }
 
 sb.onclick=()=>{
   const txt=dr.value.trim();if(!txt)return;
-  const g=S.pv&&S.pv.locked?S.pv:classify(txt);
+  const g=S.pv||Object.assign({titleManual:false},classify(txt));
+  const ttl=(g.titleManual&&g.title)?g.title:titleFrom(txt);
   const today=TODAY();
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
   if(S.edit){
     const t=byId(S.edit);
-    if(t)Object.assign(t,{title:g.title||titleFrom(txt),note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null});
+    if(t)Object.assign(t,{title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null});
     save();closeSheet();S.day=g.date;S.pv=null;S.edit=null;dr.value='';render();
     toast('تغییرات ذخیره شد.',2600);
     return;
   }
-  S.tasks.push({id:Date.now(),title:g.title||titleFrom(txt),note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0});
+  S.tasks.push({id:Date.now(),title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0});
   save();closeSheet();S.tab=g.date===addDays(today,1)?1:0;S.day=g.date;S.pv=null;dr.value='';render();
   toast(`اضافه شد به «${CATS[g.c].name}»${g.rep?' · '+g.rep+(g.until?' تا '+fa(jdate(g.until)):''):''} · پیشنهاد: ${dl} ${g.time?fa(g.time):SLOTS[g.s]}`);
 };
