@@ -332,16 +332,27 @@ function weekView(){
   return h;
 }
 
+function monthHasTasks(anchor){
+  let d=addDays(anchor,-(jparts(anchor).d-1));const m=jparts(anchor).m;
+  for(let i=0;i<32&&jparts(d).m===m;i++){if(instOn(d).length)return true;d=addDays(d,1)}
+  return false;
+}
+
 function monthView(){
   const today=TODAY(),base=S.month||today,jb=jparts(base);
   const first=addDays(base,-(jb.d-1));
   const days=[];let d=first;
   while(days.length<32&&jparts(d).m===jb.m){days.push(d);d=addDays(d,1)}
   const last=days[days.length-1];
+  const prev=addDays(first,-1),next=addDays(last,1);
+  const firstTask=S.tasks.reduce((m,t)=>(!m||t.date<m)?t.date:m,null);
+  const floor=(firstTask&&firstTask<today)?firstTask:today;
+  const showPrev=prev>=addDays(floor,-(jparts(floor).d-1));
+  const showNext=monthHasTasks(next);
   let h=`<div class="mhead">
-      <button class="mnav" data-act="mon" data-v="${addDays(first,-1)}" data-id="0">›</button>
+      ${showPrev?`<button class="mnav" data-act="mon" data-v="${prev}" data-id="0">›</button>`:'<span style="width:34px;flex:none"></span>'}
       <b>${JM[jb.m-1]} ${fa(jb.y)}</b>
-      <button class="mnav" data-act="mon" data-v="${addDays(last,1)}" data-id="0">‹</button>
+      ${showNext?`<button class="mnav" data-act="mon" data-v="${next}" data-id="0">‹</button>`:'<span style="width:34px;flex:none"></span>'}
     </div>`;
   h+='<div class="mgrid">'+WDS.map(w=>`<div class="mwd">${w}</div>`).join('');
   for(let i=0;i<wdIndex(first);i++)h+='<div class="mcell blank"></div>';
