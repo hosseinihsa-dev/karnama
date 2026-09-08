@@ -21,7 +21,7 @@ jobs:
       - name: Build site
         run: |
           mkdir -p site
-          cp index.html app.js manifest.json sw.js site/
+          cp index.html app.js style.css manifest.json sw.js site/
           python3 make_icons.py site
           touch site/.nojekyll
           ls -la site

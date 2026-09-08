@@ -13,158 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300..800&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0;height:100%;overflow:hidden}
-body{
-  background:#101114;color:#F2F0EB;
-  font-family:Vazirmatn,'Vazir','IRANSans','Segoe UI',system-ui,sans-serif;
-  display:flex;flex-direction:column;
-  height:100dvh;
-}
-button,textarea,input{font-family:inherit}
-button{border:none;background:none;padding:0;cursor:pointer;color:inherit}
-::-webkit-scrollbar{width:0}
-
-/* ---------- header ---------- */
-header{padding:calc(18px + env(safe-area-inset-top)) 20px 12px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
-#greet{font:800 22px/1.3 inherit;color:#F2F0EB;letter-spacing:-.2px;margin:0}
-#sub{font:400 12.5px/1.4 inherit;color:#8A8D95;margin:4px 0 0}
-#logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(150deg,#C9A227,#8f7016);display:flex;align-items:center;justify-content:center;font:800 15px inherit;color:#151107;flex:none}
-
-/* ---------- scroll ---------- */
-main{flex:1;overflow-y:auto;padding:0 20px 150px;-webkit-overflow-scrolling:touch}
-.col{display:flex;flex-direction:column;gap:16px}
-
-/* ---------- overdue ---------- */
-.overdue{padding:14px;border-radius:20px;background:rgba(201,162,39,.06);border:1px solid rgba(201,162,39,.28);display:flex;flex-direction:column;gap:10px}
-.ov-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-.ov-title{font:700 13px inherit;color:#E8C551}
-.ov-note{font:400 11.5px/1.6 inherit;color:#9A9DA5;margin-top:4px}
-.ov-all{white-space:nowrap;padding:8px 12px;border-radius:11px;font:600 11.5px/1 inherit;color:#151107;background:linear-gradient(150deg,#C9A227,#a9821a)}
-.ov-item{padding:12px;border-radius:15px;background:#16171b;border:1px solid #24262d;display:flex;flex-direction:column;gap:9px}
-.ov-row{display:flex;gap:8px;align-items:center}
-.dot{width:6px;height:6px;border-radius:99px;flex:none}
-.ov-name{font:600 13.5px/1.4 inherit;color:#EDEBE6;flex:1;min-width:0}
-.ov-late{font:500 11px inherit;color:#B08A22;flex:none}
-.ov-nudge{font:400 11px/1.6 inherit;color:#8A8D95;padding:7px 10px;border-radius:10px;background:#1b1d23}
-.ov-acts{display:flex;gap:7px}
-.ov-acts button{font:600 11.5px inherit;padding:8px 0;border-radius:11px;flex:1}
-.b-gold{color:#C9A227;background:rgba(201,162,39,.12)}
-.b-nu{color:#9A9DA5;background:#1e2027}
-.b-drop{flex:none!important;padding:8px 11px!important;color:#7C7F87;background:#1e2027}
-
-/* ---------- progress ---------- */
-.prog{padding:16px 18px;border-radius:20px;background:linear-gradient(160deg,#1c1d22,#151619);border:1px solid #272931;display:flex;flex-direction:column;gap:12px}
-.prog-top{display:flex;justify-content:space-between;align-items:baseline}
-.prog-msg{font:600 14px inherit;color:#D9D6CF}
-.prog-pct{font:700 13px inherit;color:#C9A227}
-.track{height:8px;border-radius:99px;background:#25272e;overflow:hidden}
-.fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#C9A227,#f0d268);transition:width .45s cubic-bezier(.4,0,.2,1)}
-
-/* ---------- sort ---------- */
-.seg{padding:4px;border-radius:14px;background:#16171b;border:1px solid #24262d;display:flex;gap:6px}
-.seg button{flex:1;padding:8px 0;border-radius:11px;font:600 12px inherit;color:#8A8D95;transition:all .2s}
-.seg button.on{color:#151107;background:linear-gradient(150deg,#C9A227,#b8901d)}
-.seg-note{font:400 11.5px inherit;color:#7C7F87;margin-top:9px}
-
-/* ---------- tasks ---------- */
-.list{display:flex;flex-direction:column;gap:10px}
-.ghead{display:flex;gap:9px;align-items:center;padding-top:4px}
-.ghead b{font:700 12px inherit;color:#C9A227}
-.ghead i{flex:1;height:1px;background:#22242b}
-.ghead span{font:400 11px inherit;color:#6E7179}
-.task{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:18px;background:#16171b;border:1px solid #24262d;animation:ka-in .35s ease both}
-.box{width:26px;height:26px;border-radius:9px;border:1.5px solid #3A3D44;background:transparent;flex:none;display:flex;align-items:center;justify-content:center;font:700 13px inherit;color:#151107;transition:all .2s}
-.box.on{border-color:#C9A227;background:#C9A227}
-.tmid{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
-.ttl{font:600 15px/1.45 inherit;color:#EDEBE6;word-break:break-word}
-.ttl.done{color:#6E7179;text-decoration:line-through}
-.chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{border-radius:99px;padding:3px 9px 4px;font:500 11px inherit;display:inline-flex;align-items:center;gap:5px}
-.chip .d5{width:5px;height:5px;border-radius:99px}
-.c-nu{color:#9A9DA5;background:#1e2027}
-.c-inf{color:#7FB2E8;background:rgba(127,178,232,.12)}
-.c-rem{color:#C9A227;background:rgba(201,162,39,.12)}
-.rank{font:800 12px inherit;color:#4C4F57;flex:none;padding-top:3px}
-.tdel{flex:none;padding-top:2px;color:#3A3D44;font:400 17px/1 inherit}
-
-/* ---------- suggestion / empty ---------- */
-.sugg{padding:14px 16px;border-radius:18px;border:1px dashed #2c2f37;font:400 12.5px/1.7 inherit;color:#8A8D95}
-.sugg b{font-weight:600;color:#C9A227}
-.empty{padding:26px;text-align:center;border-radius:16px;border:1px dashed #2c2f37;font:400 12.5px/1.7 inherit;color:#7C7F87}
-
-/* ---------- week ---------- */
-.days{display:flex;gap:8px}
-.day{flex:1;padding:10px 4px;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:7px;background:#16171b;border:1px solid #24262d;transition:all .2s}
-.day.on{background:rgba(201,162,39,.12);border-color:#C9A227}
-.day .dn{font:500 11px inherit;color:#7C7F87}
-.day.on .dn{color:#C9A227}
-.day .dc{font:700 15px inherit;color:#9A9DA5}
-.day.on .dc{color:#F2F0EB}
-.day .dd{width:5px;height:5px;border-radius:99px;background:transparent}
-.day .dd.has{background:#3A3D44}
-.day.on .dd.has{background:#C9A227}
-.day.today .dn{text-decoration:underline;text-underline-offset:3px}
-.dayhead{font:700 13px inherit;color:#F2F0EB}
-.drow{display:flex;gap:12px;align-items:center;padding:13px 14px;border-radius:16px;background:#16171b;border:1px solid #24262d}
-.acc{width:3px;align-self:stretch;border-radius:99px;flex:none}
-.drow .t{font:600 14px/1.4 inherit;color:#E8E6E1}
-.drow .m{font:400 11.5px inherit;color:#8A8D95;margin-top:5px}
-
-/* ---------- categories ---------- */
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.cat{padding:14px;border-radius:18px;background:#16171b;border:1px solid #24262d;display:flex;flex-direction:column;gap:10px}
-.tile{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center}
-.tile svg{width:19px;height:19px;fill:currentColor}
-.cat .n{font:600 13px/1.4 inherit;color:#E8E6E1}
-.cat .c{font:400 11.5px inherit;color:#7C7F87}
-
-/* ---------- fab + tabs ---------- */
-#fab{position:fixed;bottom:calc(88px + env(safe-area-inset-bottom));left:20px;width:56px;height:56px;border-radius:20px;background:linear-gradient(150deg,#C9A227,#a9821a);color:#151107;font:300 30px/1 inherit;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 26px rgba(201,162,39,.28);z-index:3}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;gap:4px;padding:10px 16px calc(16px + env(safe-area-inset-bottom));background:linear-gradient(to top,#101114 60%,rgba(16,17,20,0));border-top:1px solid #1d1f25;z-index:2}
-nav button{flex:1;padding:9px 0;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:6px}
-nav i{width:16px;height:2.5px;border-radius:99px;background:#6E7179;display:block}
-nav span{font:600 12px inherit;color:#6E7179}
-nav button.on{background:rgba(201,162,39,.10)}
-nav button.on i{background:#C9A227}
-nav button.on span{color:#C9A227}
-
-/* ---------- sheet ---------- */
-#ov{position:fixed;inset:0;z-index:5;display:none;flex-direction:column;justify-content:flex-end}
-#ov.show{display:flex}
-#scrim{position:absolute;inset:0;background:rgba(6,6,8,.62);backdrop-filter:blur(2px)}
-#sheet{position:relative;background:#15161a;border-top:1px solid #2a2c34;border-radius:26px 26px 0 0;padding:18px 20px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;animation:ka-up .28s cubic-bezier(.3,1,.4,1) both;max-height:92dvh;overflow-y:auto}
-.grab{width:40px;height:4px;border-radius:99px;background:#31343c;align-self:center}
-.sh-t{font:700 15px inherit;color:#F2F0EB}
-#draft{width:100%;min-height:74px;resize:none;border-radius:16px;background:#1b1d23;border:1px solid #2a2c34;padding:13px 14px;font:400 14px/1.7 inherit;color:#EDEBE6;direction:rtl}
-#draft::placeholder{color:#5E6169}
-#draft:focus{outline:none;border-color:#3a3d46}
-#prev{padding:13px 14px;border-radius:16px;background:#1b1d23;border:1px solid #2a2c34;display:none;flex-direction:column;gap:10px}
-#prev.show{display:flex}
-.pv-l{font:500 11px inherit;color:#7C7F87}
-#prev .chip{padding:5px 11px 6px;font-size:11.5px;border:1px solid transparent}
-#prev .chip:active{border-color:#3f434c}
-#submit{width:100%;height:52px;border-radius:18px;font:700 15px inherit;transition:all .2s;background:#1b1d23;color:#5E6169}
-#submit.on{background:linear-gradient(150deg,#C9A227,#a9821a);color:#151107}
-.hint{text-align:center;font:400 11.5px/1.7 inherit;color:#6E7179}
-
-/* ---------- picker ---------- */
-#pick{position:fixed;inset:0;z-index:7;display:none;align-items:center;justify-content:center;padding:26px}
-#pick.show{display:flex}
-#pick .bd{position:absolute;inset:0;background:rgba(6,6,8,.7)}
-#pick .bx{position:relative;width:100%;max-width:330px;max-height:70dvh;overflow-y:auto;background:#16171b;border:1px solid #2a2c34;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:8px}
-#pick .bx h4{margin:0 0 4px;font:700 13px inherit;color:#F2F0EB}
-#pick .op{padding:11px 13px;border-radius:13px;background:#1b1d23;font:500 13px inherit;color:#D9D6CF;text-align:right;display:flex;align-items:center;gap:8px}
-#pick .op.on{background:rgba(201,162,39,.14);color:#C9A227}
-
-/* ---------- toast ---------- */
-#toast{position:fixed;bottom:calc(158px + env(safe-area-inset-bottom));right:20px;left:20px;z-index:6;padding:13px 15px;border-radius:16px;background:#22242b;border:1px solid #C9A227;font:600 12.5px/1.6 inherit;color:#F2F0EB;text-align:center;animation:ka-in .3s ease both;display:none}
-#toast.show{display:block}
-
-@keyframes ka-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@keyframes ka-up{from{transform:translateY(100%)}to{transform:none}}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -178,7 +27,7 @@ nav button.on span{color:#C9A227}
 
 <main><div id="view" class="col"></div></main>
 
-<button id="fab">+</button>
+<button id="fab" aria-label="افزودن کار"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"/></svg></button>
 
 <nav>
   <button data-tab="0" class="on"><i></i><span>امروز</span></button>
@@ -190,13 +39,14 @@ nav button.on span{color:#C9A227}
   <div id="scrim"></div>
   <div id="sheet">
     <div class="grab"></div>
-    <div class="sh-t">چی تو ذهنته؟</div>
+    <div class="sh-t" id="sh-title">چی تو ذهنته؟</div>
     <textarea id="draft" rows="3" placeholder="مثلاً: هفته‌ی دیگه با دکتر قرار بگیرم"></textarea>
     <div id="prev">
       <div class="pv-l">کارنما این‌طور فهمید — برای تغییر، روی هرکدام بزن</div>
       <div class="chips" id="pvchips"></div>
     </div>
     <button id="submit">بسپار به کارنما</button>
+    <button id="sh-del">حذف این کار</button>
     <div class="hint">می‌توانی بنویسی «هر روز صبح ورزش کنم» — تکرار را خودش می‌فهمد.</div>
   </div>
 </div>
