@@ -64,6 +64,7 @@ main{flex:1;overflow-y:auto;padding:0 20px 150px;-webkit-overflow-scrolling:touc
 .tmid{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .ttl{font:600 15px/1.45 inherit;color:#EDEBE6;word-break:break-word;cursor:pointer}
 .ttl.done{color:#6E7179;text-decoration:line-through}
+.note{font:400 12px/1.6 inherit;color:#8A8D95;margin-top:4px;zoom:.85}
 .chips{display:flex;flex-wrap:wrap;gap:6px;zoom:.72}
 .chip{border-radius:99px;padding:3px 9px 4px;font:500 12px/1.6 inherit;display:inline-flex;align-items:center;gap:5px}
 .chip .d5{width:5px;height:5px;border-radius:99px;flex:none}
@@ -140,6 +141,9 @@ nav button.on span{color:#C9A227}
 #prev{padding:13px 14px;border-radius:16px;background:#1b1d23;border:1px solid #2a2c34;display:none;flex-direction:column;gap:10px}
 #prev.show{display:flex}
 .pv-l{font:500 11px inherit;color:#7C7F87}
+#pv-title{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;padding-top:2px;font:400 11.5px/1.7 inherit;color:#7C7F87;cursor:pointer}
+#pv-title b{font-weight:600;color:#EDEBE6}
+#pv-title i{font-style:normal;font-size:10.5px;color:#C9A227}
 #prev .chips{zoom:1}
 #prev .chip{padding:5px 11px 6px;font:500 11.5px/1.6 inherit;gap:5px;border:1px solid transparent}
 #prev .chip .d5{width:5px;height:5px}
