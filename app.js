@@ -110,11 +110,33 @@ S.tasks=load();
  if(S.tasks.length!==before)try{localStorage.setItem(KEY,JSON.stringify({tasks:S.tasks}))}catch(e){}}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({tasks:S.tasks}))}catch(e){}};
 
+/* ---- learning: remember the categories you correct by hand ---- */
+const LKEY='karnama.learn.v1';
+let LEARN=(()=>{try{return JSON.parse(localStorage.getItem(LKEY))||{}}catch(e){return {}}})();
+const saveLearn=()=>{try{localStorage.setItem(LKEY,JSON.stringify(LEARN))}catch(e){}};
+const STOPW=new Set(['را','رو','با','برای','از','به','در','که','یک','هر','تا','این','آن','هم','ولی','اما','باید',
+  'کنم','بکنم','بزنم','بگیرم','بدهم','بشه','شود','کن','بده','خودم','یادم','باشه','ساعت','روز','هفته','ماه','امروز','فردا','صبح','شب','ظهر','عصر','بعدازظهر','فوری','مهم']);
+function lwords(t){
+  return (t||'').replace(/[^؀-ۿ\s]/g,' ').split(/\s+/)
+    .map(w=>w.replace(/[‌]/g,'')).filter(w=>w.length>=3&&!STOPW.has(w));
+}
+const BUILTIN_KW=new Set(CATS.flatMap(c=>c.kw.flatMap(k=>k.split(/\s+/))).map(w=>w.replace(/[‌]/g,'')));
+function learnCat(text,c){
+  const ws=lwords(text).filter(w=>!BUILTIN_KW.has(w));if(!ws.length)return;
+  ws.forEach(w=>{LEARN[w]=c});
+  const keys=Object.keys(LEARN);
+  if(keys.length>600)keys.slice(0,keys.length-600).forEach(k=>delete LEARN[k]);
+  saveLearn();
+}
+
 /* ================= classify ================= */
 function classify(text){
   const t=(text||'').trim();
   let c=11,best=0;
   CATS.forEach((cat,i)=>{const n=cat.kw.filter(k=>t.includes(k)).length;if(n>best){best=n;c=i}});
+  const lv=lwords(t).map(w=>LEARN[w]).filter(v=>v!==undefined&&v!==null);
+  if(lv.length){const cnt={};lv.forEach(v=>cnt[v]=(cnt[v]||0)+1);
+    c=+Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0];}
   let rep=null;
   if(/هر\s?روز|روزانه/.test(t))rep='هر روز';
   else if(/هر\s?هفته|هفتگی/.test(t))rep='هر هفته';
@@ -242,6 +264,8 @@ function render(){
       else if(a==='day'){S.day=el.dataset.v;render()}
       else if(a==='mon'){S.month=el.dataset.v;render()}
       else if(a==='cat'){S.cat=el.dataset.v===''?null:+el.dataset.v;render()}
+      else if(a==='backup')doBackup();
+      else if(a==='restore'){const i=document.getElementById('imp');if(i)i.click()}
     };
   });
 }
@@ -390,13 +414,49 @@ function catView(){
       </div></div>`).join('')+'</div>';
     return h;
   }
-  return '<div class="grid">'+CATS.map((c,i)=>{
+  let g='<div class="grid">'+CATS.map((c,i)=>{
     const n=S.tasks.filter(t=>t.c===i&&(t.rep||!t.done)).length;
     return `<div class="cat" data-act="cat" data-v="${i}" data-id="0"><div class="tile" style="color:${col(c.h)};background:${col(c.h,.13)}">
       <svg viewBox="0 0 24 24"><path d="${c.ic}"/></svg></div>
       <div class="n">${c.name}</div><div class="c">${n?fa(n)+' کار':'خالی'}</div></div>`;
   }).join('')+'</div>';
+  g+=`<div class="sugg" style="display:flex;flex-direction:column;gap:11px">
+      <div><b>پشتیبان‌گیری: </b>کارها فقط روی همین گوشی ذخیره می‌شوند. هر از گاهی یک فایل پشتیبان بگیر تا با پاک‌شدن حافظه یا عوض‌کردن گوشی از دست نروند.</div>
+      <div style="display:flex;gap:8px">
+        <button class="b-gold" style="flex:1;padding:11px 0;border-radius:12px;font:600 12px inherit" data-act="backup" data-id="0">گرفتن فایل پشتیبان</button>
+        <button class="b-nu" style="flex:1;padding:11px 0;border-radius:12px;font:600 12px inherit" data-act="restore" data-id="0">بازیابی از فایل</button>
+      </div></div>`;
+  return g;
 }
+
+/* ================= backup / restore ================= */
+function doBackup(){
+  const data={app:'karnama',v:1,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN};
+  const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  const j=jparts(TODAY());
+  a.href=url;a.download=`karnama-backup-${j.y}-${String(j.m).padStart(2,'0')}-${String(j.d).padStart(2,'0')}.json`;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+  toast('فایل پشتیبان ساخته شد.',3000);
+}
+function doRestore(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(!d||!Array.isArray(d.tasks))throw 0;
+      if(!confirm(`این فایل ${d.tasks.length} کار دارد. جایگزین کارهای فعلی شود؟`))return;
+      S.tasks=mergeSeries(d.tasks);
+      if(d.learn&&typeof d.learn==='object'){LEARN=d.learn;saveLearn()}
+      save();S.cat=null;render();
+      toast('بازیابی شد.',3000);
+    }catch(e){toast('این فایل پشتیبانِ کارنما نیست.',3500)}
+  };
+  r.readAsText(file);
+}
+const impEl=document.getElementById('imp');
+if(impEl)impEl.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)doRestore(f);e.target.value=''};
 
 /* ================= capture sheet ================= */
 const ov=document.getElementById('ov'),dr=document.getElementById('draft'),
@@ -492,6 +552,7 @@ sb.onclick=()=>{
   const ttl=(g.titleManual&&g.title)?g.title:titleFrom(txt);
   const today=TODAY();
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
+  {const auto=classify(txt);if(g.c!==auto.c)learnCat(txt,g.c);}
   if(S.edit){
     const t=byId(S.edit);
     if(t)Object.assign(t,{title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null});
