@@ -32,13 +32,23 @@ const weekStart=s=>addDays(s,-wdIndex(s));
 const diffDays=(a,b)=>Math.round((fromIso(a)-fromIso(b))/864e5);
 let jf;try{jf=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{day:'numeric',month:'long'})}catch(e){jf=null}
 const jdate=s=>jf?jf.format(fromIso(s)):s;
+const JM=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+const jparts=(()=>{
+  try{
+    const f=new Intl.DateTimeFormat('en-u-ca-persian',{year:'numeric',month:'numeric',day:'numeric'});
+    return s=>{const o={};f.formatToParts(fromIso(s)).forEach(x=>o[x.type]=x.value);
+      return {y:parseInt(o.year,10),m:parseInt(o.month,10),d:parseInt(o.day,10)}};
+  }catch(e){
+    return s=>{const d=fromIso(s);return{y:d.getFullYear(),m:d.getMonth()+1,d:d.getDate()}};
+  }
+})();
 
 /* ---- ordering: morning → afternoon → night, then priority ---- */
 const bySlot=(a,b)=>(a.done-b.done)||(a.s-b.s)||(a.p-b.p);
 
 /* ================= state ================= */
 const KEY='karnama.v1';
-let S={tab:0,sort:1,day:TODAY(),sheet:false,pv:null,edit:null,tasks:null};
+let S={tab:0,sort:1,day:TODAY(),month:TODAY(),sheet:false,pv:null,edit:null,tasks:null};
 function load(){
   try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&Array.isArray(r.tasks))return r.tasks}catch(e){}
   const t=TODAY();
@@ -81,6 +91,28 @@ function classify(text){
   return {c,s,p,rep,date};
 }
 
+/* ---- turn a free description into a short title ---- */
+const T_KILL=[
+  /^\s*(می‌?خوام|میخوام|می‌?خواهم|باید|لطفاً?|قراره|حتماً?|یادم باشه که|یادم باشه|یادآوری کن که|یادآوری کن)\s+/,
+];
+const T_WORDS=['پس فردا','پس‌فردا','امروز','فردا','امشب','دیشب','صبح','ظهر','بعدازظهر','بعد از ظهر','عصر','شب',
+  'هر روز','هرروز','هر هفته','هرهفته','هر ماه','هرماه',
+  'هفته دیگه','هفته‌ی دیگه','هفته بعد','هفته‌ی بعد','هفته آینده','هفته‌ی آینده',
+  'خیلی فوری','فوری','خیلی مهم','مهمه','ددلاین','سریع','حتما','حتماً',
+  'شنبه','یکشنبه','دوشنبه','سه‌شنبه','سه شنبه','چهارشنبه','چهار شنبه','پنجشنبه','پنج شنبه','جمعه'];
+function titleFrom(text){
+  let t=(text||'').replace(/\s+/g,' ').trim();
+  T_KILL.forEach(r=>{t=t.replace(r,'')});
+  t=t.replace(/ساعت\s*[\d۰-۹]+([:.٫][\d۰-۹]+)?/g,' ');
+  T_WORDS.forEach(w=>{t=t.split(w).join(' ')});
+  t=t.replace(/\s+/g,' ').replace(/^[\s,،.\-–—]+|[\s,،.\-–—]+$/g,'');
+  t=t.replace(/^(که|را|رو|در|به|از)\s+/,'');
+  const w=t.split(' ').filter(Boolean);
+  if(w.length>8)t=w.slice(0,8).join(' ')+'…';
+  t=t.trim();
+  return t.length>=3?t:(text||'').trim().slice(0,60);
+}
+
 /* ================= helpers ================= */
 const catChip=t=>`<span class="chip" style="color:${col(CATS[t.c].h)};background:${col(CATS[t.c].h,.13)}"><span class="d5" style="background:${col(CATS[t.c].h)}"></span>${CATS[t.c].name}</span>`;
 function taskChips(t){
@@ -109,7 +141,7 @@ function remove(id){S.tasks=S.tasks.filter(t=>t.id!==id);save();render()}
 function taskCard(t,i){
   return `<div class="task">
       <button class="box ${t.done?'on':''}" data-act="toggle" data-id="${t.id}">${t.done?'✓':''}</button>
-      <div class="tmid"><div class="ttl ${t.done?'done':''}" data-act="edit" data-id="${t.id}">${esc(t.title)}</div><div class="chips">${taskChips(t)}</div></div>
+      <div class="tmid"><div data-act="edit" data-id="${t.id}"><div class="ttl ${t.done?'done':''}">${esc(t.title)}</div>${t.note&&t.note!==t.title?`<div class="note">${esc(t.note)}</div>`:''}</div><div class="chips">${taskChips(t)}</div></div>
       <span class="rank">${fa(String(i+1).padStart(2,'0'))}</span></div>`;
 }
 
@@ -122,7 +154,7 @@ function render(){
   document.getElementById('sub').textContent=fa(`${WD[wdIndex(today)]} ${jdate(today)} · ${list.length} کار برای امروز · ${doneN} انجام شده`);
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',+b.dataset.tab===S.tab));
   const v=document.getElementById('view');
-  v.innerHTML=[todayView,tomorrowView,weekView,catView][S.tab](overdue,list,doneN,today);
+  v.innerHTML=[todayView,tomorrowView,weekView,monthView,catView][S.tab](overdue,list,doneN,today);
   v.querySelectorAll('[data-act]').forEach(el=>{
     el.onclick=()=>{
       const id=+el.dataset.id,a=el.dataset.act;
@@ -135,6 +167,7 @@ function render(){
       else if(a==='allToday'){overdue.forEach(t=>t.date=TODAY());save();render()}
       else if(a==='sort'){S.sort=+el.dataset.v;render()}
       else if(a==='day'){S.day=el.dataset.v;render()}
+      else if(a==='mon'){S.month=el.dataset.v;render()}
     };
   });
 }
@@ -203,6 +236,15 @@ function tomorrowView(){
   return h;
 }
 
+function dayList(d){
+  const dt=S.tasks.filter(t=>t.date===d).sort(bySlot);
+  let h=`<div class="dayhead">${fa(WD[wdIndex(d)]+' '+jdate(d))} — ${fa(dt.length)} کار</div>`;
+  if(!dt.length)return h+'<div class="empty">این روز خالیه. یک روز آزاد هم لازمه.</div>';
+  return h+'<div class="list">'+dt.map(t=>`<div class="drow"><span class="acc" style="background:${col(CATS[t.c].h)}"></span>
+    <div style="flex:1;min-width:0" data-act="edit" data-id="${t.id}"><div class="t">${esc(t.title)}</div>
+    <div class="m">${CATS[t.c].name} · ${SLOTS[t.s]} · ${PRI[t.p]}${t.rep?' · '+t.rep:''}</div></div></div>`).join('')+'</div>';
+}
+
 function weekView(){
   const today=TODAY(),ws=weekStart(today);
   let h='<div class="days">';
@@ -213,12 +255,31 @@ function weekView(){
       <span class="dd ${n?'has':''}"></span></button>`;
   }
   h+='</div>';
-  const dt=S.tasks.filter(t=>t.date===S.day).sort(bySlot);
-  h+=`<div class="dayhead">${fa(WD[wdIndex(S.day)]+' '+jdate(S.day))} — ${fa(dt.length)} کار</div>`;
-  if(!dt.length)h+='<div class="empty">این روز خالیه. یک روز آزاد هم لازمه.</div>';
-  else h+='<div class="list">'+dt.map(t=>`<div class="drow"><span class="acc" style="background:${col(CATS[t.c].h)}"></span>
-    <div style="flex:1;min-width:0" data-act="edit" data-id="${t.id}"><div class="t">${esc(t.title)}</div>
-    <div class="m">${CATS[t.c].name} · ${SLOTS[t.s]} · ${PRI[t.p]}${t.rep?' · '+t.rep:''}</div></div></div>`).join('')+'</div>';
+  h+=dayList(S.day);
+  return h;
+}
+
+function monthView(){
+  const today=TODAY(),base=S.month||today,jb=jparts(base);
+  const first=addDays(base,-(jb.d-1));
+  const days=[];let d=first;
+  while(days.length<32&&jparts(d).m===jb.m){days.push(d);d=addDays(d,1)}
+  const last=days[days.length-1];
+  let h=`<div class="mhead">
+      <button class="mnav" data-act="mon" data-v="${addDays(first,-1)}" data-id="0">›</button>
+      <b>${JM[jb.m-1]} ${fa(jb.y)}</b>
+      <button class="mnav" data-act="mon" data-v="${addDays(last,1)}" data-id="0">‹</button>
+    </div>`;
+  h+='<div class="mgrid">'+WDS.map(w=>`<div class="mwd">${w}</div>`).join('');
+  for(let i=0;i<wdIndex(first);i++)h+='<div class="mcell blank"></div>';
+  days.forEach(x=>{
+    const n=S.tasks.filter(t=>t.date===x).length;
+    h+=`<button class="mcell ${S.day===x?'on':''} ${x===today?'today':''}" data-act="day" data-v="${x}" data-id="0">
+      <span>${fa(jparts(x).d)}</span><span class="md ${n?'has':''}"></span></button>`;
+  });
+  h+='</div>';
+  const sel=days.includes(S.day)?S.day:days.includes(today)?today:first;
+  h+=dayList(sel);
   return h;
 }
 
@@ -241,7 +302,7 @@ function openSheet(id){
   document.getElementById('sh-title').textContent=t?'ویرایش کار':'چی تو ذهنته؟';
   sb.textContent=t?'ذخیره‌ی تغییرات':'بسپار به کارنما';
   document.getElementById('sh-del').style.display=t?'block':'none';
-  if(t){dr.value=t.title;S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,date:t.date,locked:true}}
+  if(t){dr.value=t.note||t.title;S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,date:t.date,title:t.title,locked:true}}
   else {dr.value='';S.pv=null}
   updatePv();ov.classList.add('show');setTimeout(()=>dr.focus(),60);
 }
@@ -264,8 +325,15 @@ function updatePv(){
     `<button class="chip c-nu" data-f="p">${PRI[g.p]}</button>`+
     `<button class="chip c-inf" data-f="rep">${g.rep||'بدون تکرار'}</button>`;
   pc.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>picker(b.dataset.f));
+  const tl=document.getElementById('pv-title');
+  tl.innerHTML=`<span>عنوان: </span><b>${esc(S.pv.title||titleFrom(txt))}</b><i>ویرایش</i>`;
+  tl.onclick=()=>{
+    const cur=S.pv.title||titleFrom(dr.value.trim());
+    const v=prompt('عنوان کار:',cur);
+    if(v&&v.trim()){S.pv.title=v.trim();S.pv.locked=true;updatePv()}
+  };
 }
-dr.addEventListener('input',()=>{if(S.pv)S.pv.locked=false;updatePv()});
+dr.addEventListener('input',()=>{if(S.pv){S.pv.locked=false;S.pv.title=null}updatePv()});
 
 /* --- picker --- */
 const pk=document.getElementById('pick'),pkbx=pk.querySelector('.bx');
@@ -296,12 +364,12 @@ sb.onclick=()=>{
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
   if(S.edit){
     const t=byId(S.edit);
-    if(t)Object.assign(t,{title:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null});
+    if(t)Object.assign(t,{title:g.title||titleFrom(txt),note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null});
     save();closeSheet();S.day=g.date;S.pv=null;S.edit=null;dr.value='';render();
     toast('تغییرات ذخیره شد.',2600);
     return;
   }
-  S.tasks.push({id:Date.now(),title:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,rem:g.p===0});
+  S.tasks.push({id:Date.now(),title:g.title||titleFrom(txt),note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,rem:g.p===0});
   save();closeSheet();S.tab=g.date===addDays(today,1)?1:0;S.day=g.date;S.pv=null;dr.value='';render();
   toast(`اضافه شد به «${CATS[g.c].name}» · ${PRI[g.p]} · پیشنهاد: ${dl} ${SLOTS[g.s]}`);
 };
@@ -311,7 +379,7 @@ document.getElementById('sh-del').onclick=()=>{
   remove(S.edit);S.edit=null;closeSheet();toast('کار حذف شد.',2600);
 };
 
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===2)S.day=TODAY();render()});
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===2)S.day=TODAY();if(S.tab===3){S.month=TODAY();S.day=TODAY()}render()});
 
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
 
