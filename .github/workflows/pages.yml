@@ -20,11 +20,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build site
         run: |
-          python3 -m pip install --quiet pillow
           mkdir -p site
           cp index.html manifest.json sw.js site/
           python3 make_icons.py site
           touch site/.nojekyll
+          ls -la site
       - uses: actions/configure-pages@v5
         with:
           enablement: true
