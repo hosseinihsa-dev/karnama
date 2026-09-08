@@ -122,7 +122,6 @@ function render(){
       else if(a==='tomorrow')patch(id,{date:addDays(TODAY(),1),moved:(byId(id).moved||0)+1});
       else if(a==='done')patch(id,{date:TODAY(),done:true});
       else if(a==='drop'){remove(id);toast('حذف شد. بعضی کارها لازم نیستند.',3000)}
-      else if(a==='del'){if(confirm('این کار حذف شود؟'))remove(id)}
       else if(a==='allToday'){overdue.forEach(t=>t.date=TODAY());save();render()}
       else if(a==='sort'){S.sort=+el.dataset.v;render()}
       else if(a==='day'){S.day=el.dataset.v;render()}
@@ -171,7 +170,6 @@ function todayView(overdue,list,doneN,today){
     lh+=`<div class="task">
       <button class="box ${t.done?'on':''}" data-act="toggle" data-id="${t.id}">${t.done?'✓':''}</button>
       <div class="tmid"><div class="ttl ${t.done?'done':''}" data-act="edit" data-id="${t.id}">${esc(t.title)}</div><div class="chips">${taskChips(t)}</div></div>
-      <button class="tdel" data-act="del" data-id="${t.id}">×</button>
       <span class="rank">${fa(String(i+1).padStart(2,'0'))}</span></div>`;
   });
   h+=`<div class="list">${lh||'<div class="empty">امروز کاری ثبت نشده. با دکمه‌ی + شروع کن.</div>'}</div>`;
@@ -197,8 +195,7 @@ function weekView(){
   if(!dt.length)h+='<div class="empty">این روز خالیه. یک روز آزاد هم لازمه.</div>';
   else h+='<div class="list">'+dt.map(t=>`<div class="drow"><span class="acc" style="background:${col(CATS[t.c].h)}"></span>
     <div style="flex:1;min-width:0" data-act="edit" data-id="${t.id}"><div class="t">${esc(t.title)}</div>
-    <div class="m">${CATS[t.c].name} · ${SLOTS[t.s]} · ${PRI[t.p]}${t.rep?' · '+t.rep:''}</div></div>
-    <button class="tdel" data-act="del" data-id="${t.id}">×</button></div>`).join('')+'</div>';
+    <div class="m">${CATS[t.c].name} · ${SLOTS[t.s]} · ${PRI[t.p]}${t.rep?' · '+t.rep:''}</div></div></div>`).join('')+'</div>';
   return h;
 }
 
