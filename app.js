@@ -33,9 +33,12 @@ const diffDays=(a,b)=>Math.round((fromIso(a)-fromIso(b))/864e5);
 let jf;try{jf=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{day:'numeric',month:'long'})}catch(e){jf=null}
 const jdate=s=>jf?jf.format(fromIso(s)):s;
 
+/* ---- ordering: morning → afternoon → night, then priority ---- */
+const bySlot=(a,b)=>(a.done-b.done)||(a.s-b.s)||(a.p-b.p);
+
 /* ================= state ================= */
 const KEY='karnama.v1';
-let S={tab:0,sort:0,day:TODAY(),sheet:false,pv:null,edit:null,tasks:null};
+let S={tab:0,sort:1,day:TODAY(),sheet:false,pv:null,edit:null,tasks:null};
 function load(){
   try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&Array.isArray(r.tasks))return r.tasks}catch(e){}
   const t=TODAY();
@@ -113,7 +116,7 @@ function taskCard(t,i){
 /* ================= render ================= */
 function render(){
   const today=TODAY();
-  const overdue=S.tasks.filter(t=>!t.done&&t.date<today);
+  const overdue=S.tasks.filter(t=>!t.done&&t.date<today).sort(bySlot);
   const list=S.tasks.filter(t=>t.date===today);
   const doneN=list.filter(t=>t.done).length;
   document.getElementById('sub').textContent=fa(`${WD[wdIndex(today)]} ${jdate(today)} · ${list.length} کار برای امروز · ${doneN} انجام شده`);
@@ -159,14 +162,14 @@ function todayView(overdue,list,doneN,today){
   const msg=pct===100&&list.length?'همه رو زدی. عالی بود.':pct>=50?'نصف راه رو رفتی، ادامه بده':'با یک کار کوچک شروع کن';
   h+=`<div class="prog"><div class="prog-top"><span class="prog-msg">${msg}</span><span class="prog-pct">${fa(pct)}٪</span></div>
       <div class="track"><div class="fill" style="width:${pct}%"></div></div></div>`;
-  const notes=['','صبح، بعدازظهر و شب — به ترتیب زمان انجام','کارهای هم‌دسته پشت سر هم، تا یک‌جا تمامشان کنی'];
+  const notes=['','صبح، بعدازظهر و شب — و در هر بازه، مهم‌ترین کار بالاتر','کارهای هم‌دسته پشت سر هم، تا یک‌جا تمامشان کنی'];
   h+=`<div><div class="seg">${['به ترتیب اولویت','به ترتیب زمان','بر اساس دسته'].map((s,i)=>
       `<button class="${S.sort===i?'on':''}" data-act="sort" data-v="${i}" data-id="0">${s}</button>`).join('')}</div>
       ${notes[S.sort]?`<div class="seg-note">${notes[S.sort]}</div>`:''}</div>`;
 
   const cmp=[(a,b)=>(a.done-b.done)||(a.p-b.p)||(a.s-b.s),
-             (a,b)=>(a.done-b.done)||(a.s-b.s)||(a.p-b.p),
-             (a,b)=>(a.done-b.done)||(a.c-b.c)||(a.p-b.p)][S.sort];
+             bySlot,
+             (a,b)=>(a.done-b.done)||(a.c-b.c)||(a.s-b.s)||(a.p-b.p)][S.sort];
   const sorted=[...list].sort(cmp);
   const gk=t=>S.sort===1?SLOTS[t.s]:S.sort===2?CATS[t.c].name:'';
   const gc={};sorted.forEach(t=>{gc[gk(t)]=(gc[gk(t)]||0)+1});
@@ -187,9 +190,15 @@ function todayView(overdue,list,doneN,today){
 function tomorrowView(){
   const d=addDays(TODAY(),1);
   const list=S.tasks.filter(t=>t.date===d);
-  const sorted=[...list].sort((a,b)=>(a.done-b.done)||(a.p-b.p)||(a.s-b.s));
+  const sorted=[...list].sort(bySlot);
   let h=`<div class="dayhead">فردا — ${fa(WD[wdIndex(d)]+' '+jdate(d))} · ${fa(list.length)} کار</div>`;
-  h+=`<div class="list">${sorted.map((t,i)=>taskCard(t,i)).join('')||'<div class="empty">فردا هنوز خالی است. با دکمه‌ی + چیزی برایش بگذار.</div>'}</div>`;
+  let lh='';
+  sorted.forEach((t,i)=>{
+    if(i===0||sorted[i-1].s!==t.s||sorted[i-1].done!==t.done)
+      lh+=`<div class="ghead"><b>${SLOTS[t.s]}</b><i></i><span>${fa(sorted.filter(x=>x.s===t.s).length)} کار</span></div>`;
+    lh+=taskCard(t,i);
+  });
+  h+=`<div class="list">${lh||'<div class="empty">فردا هنوز خالی است. با دکمه‌ی + چیزی برایش بگذار.</div>'}</div>`;
   if(sorted.length)h+=`<div class="sugg"><b>یادت باشد: </b>کارهای فردا را می‌توانی همین حالا هم انجام بدهی — روی متن هر کار بزن و روزش را به امروز عوض کن.</div>`;
   return h;
 }
@@ -204,7 +213,7 @@ function weekView(){
       <span class="dd ${n?'has':''}"></span></button>`;
   }
   h+='</div>';
-  const dt=S.tasks.filter(t=>t.date===S.day);
+  const dt=S.tasks.filter(t=>t.date===S.day).sort(bySlot);
   h+=`<div class="dayhead">${fa(WD[wdIndex(S.day)]+' '+jdate(S.day))} — ${fa(dt.length)} کار</div>`;
   if(!dt.length)h+='<div class="empty">این روز خالیه. یک روز آزاد هم لازمه.</div>';
   else h+='<div class="list">'+dt.map(t=>`<div class="drow"><span class="acc" style="background:${col(CATS[t.c].h)}"></span>
