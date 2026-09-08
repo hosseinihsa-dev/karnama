@@ -64,9 +64,9 @@ main{flex:1;overflow-y:auto;padding:0 20px 150px;-webkit-overflow-scrolling:touc
 .tmid{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .ttl{font:600 15px/1.45 inherit;color:#EDEBE6;word-break:break-word;cursor:pointer}
 .ttl.done{color:#6E7179;text-decoration:line-through}
-.chips{display:flex;flex-wrap:wrap;gap:5px}
-.chip{border-radius:99px;padding:2px 7px 3px;font:500 8.5px/1.6 inherit;display:inline-flex;align-items:center;gap:4px}
-.chip .d5{width:4px;height:4px;border-radius:99px;flex:none}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{border-radius:99px;padding:1px 6px 2px;font:500 7.2px/1.7 inherit;display:inline-flex;align-items:center;gap:3px}
+.chip .d5{width:3.5px;height:3.5px;border-radius:99px;flex:none}
 .c-nu{color:#9A9DA5;background:#1e2027}
 .c-inf{color:#7FB2E8;background:rgba(127,178,232,.12)}
 .c-rem{color:#C9A227;background:rgba(201,162,39,.12)}
