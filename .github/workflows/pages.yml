@@ -21,13 +21,11 @@ jobs:
       - name: Build site
         run: |
           mkdir -p site
-          cp index.html manifest.json sw.js site/
+          cp index.html app.js manifest.json sw.js site/
           python3 make_icons.py site
           touch site/.nojekyll
           ls -la site
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
