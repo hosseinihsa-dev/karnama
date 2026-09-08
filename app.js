@@ -74,7 +74,7 @@ const bySlot=(a,b)=>{
 
 /* ================= state ================= */
 const KEY='karnama.v1';
-let S={tab:0,sort:1,day:TODAY(),month:TODAY(),sheet:false,pv:null,edit:null,tasks:null};
+let S={tab:0,sort:1,day:TODAY(),month:TODAY(),cat:null,sheet:false,pv:null,edit:null,tasks:null};
 function load(){
   try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&Array.isArray(r.tasks))return r.tasks}catch(e){}
   const t=TODAY();
@@ -241,6 +241,7 @@ function render(){
       else if(a==='sort'){S.sort=+el.dataset.v;render()}
       else if(a==='day'){S.day=el.dataset.v;render()}
       else if(a==='mon'){S.month=el.dataset.v;render()}
+      else if(a==='cat'){S.cat=el.dataset.v===''?null:+el.dataset.v;render()}
     };
   });
 }
@@ -367,10 +368,31 @@ function monthView(){
   return h;
 }
 
+const dlabel=d=>{const t=TODAY();
+  return d===t?'امروز':d===addDays(t,1)?'فردا':d===addDays(t,-1)?'دیروز':fa(WD[wdIndex(d)]+' '+jdate(d))};
+
 function catView(){
+  if(S.cat!==null&&S.cat!==undefined){
+    const c=CATS[S.cat];
+    const items=S.tasks.filter(t=>t.c===S.cat)
+      .sort((a,b)=>((a.done?1:0)-(b.done?1:0))||(a.date<b.date?-1:a.date>b.date?1:0)||(a.s-b.s)||(a.p-b.p));
+    let h=`<div class="mhead">
+      <button class="mnav" data-act="cat" data-v="" data-id="0">›</button>
+      <b style="display:flex;align-items:center;gap:8px">
+        <span class="tile" style="width:28px;height:28px;border-radius:9px;color:${col(c.h)};background:${col(c.h,.13)}"><svg viewBox="0 0 24 24"><path d="${c.ic}"/></svg></span>
+        ${c.name} — ${fa(items.length)} کار</b>
+      <span style="width:34px;flex:none"></span></div>`;
+    if(!items.length)h+='<div class="empty">در این دسته هنوز کاری ثبت نشده.</div>';
+    else h+='<div class="list">'+items.map(t=>`<div class="drow"><span class="acc" style="background:${col(c.h)}"></span>
+      <div style="flex:1;min-width:0" data-act="edit" data-id="${t.id}">
+        <div class="t" ${t.done&&!t.rep?'style="text-decoration:line-through;color:#6E7179"':''}>${esc(t.title)}</div>
+        <div class="m">${t.rep?t.rep+(t.until?' تا '+fa(jdate(t.until)):'')+' · از '+dlabel(t.date):dlabel(t.date)} · ${t.time?fa(t.time):SLOTS[t.s]} · ${PRI[t.p]}</div>
+      </div></div>`).join('')+'</div>';
+    return h;
+  }
   return '<div class="grid">'+CATS.map((c,i)=>{
     const n=S.tasks.filter(t=>t.c===i&&(t.rep||!t.done)).length;
-    return `<div class="cat"><div class="tile" style="color:${col(c.h)};background:${col(c.h,.13)}">
+    return `<div class="cat" data-act="cat" data-v="${i}" data-id="0"><div class="tile" style="color:${col(c.h)};background:${col(c.h,.13)}">
       <svg viewBox="0 0 24 24"><path d="${c.ic}"/></svg></div>
       <div class="n">${c.name}</div><div class="c">${n?fa(n)+' کار':'خالی'}</div></div>`;
   }).join('')+'</div>';
@@ -487,7 +509,7 @@ document.getElementById('sh-del').onclick=()=>{
   remove(S.edit);S.edit=null;closeSheet();toast('کار حذف شد.',2600);
 };
 
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===2)S.day=TODAY();if(S.tab===3){S.month=TODAY();S.day=TODAY()}render()});
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===2)S.day=TODAY();if(S.tab===3){S.month=TODAY();S.day=TODAY()}if(S.tab===4)S.cat=null;render()});
 
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
 
