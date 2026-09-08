@@ -51,6 +51,8 @@ main{flex:1;overflow-y:auto;padding:0 20px 150px;-webkit-overflow-scrolling:touc
 .seg button{flex:1;padding:8px 0;border-radius:11px;font:600 12px inherit;color:#8A8D95;transition:all .2s}
 .seg button.on{color:#151107;background:linear-gradient(150deg,#C9A227,#b8901d)}
 .seg-note{font:400 11.5px inherit;color:#7C7F87;margin-top:9px}
+/* order is always time → priority, so the switcher is hidden */
+.seg,.seg-note{display:none!important}
 
 /* ---------- tasks ---------- */
 .list{display:flex;flex-direction:column;gap:10px}
