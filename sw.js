@@ -1,5 +1,5 @@
-const C = 'karnama-v5';
-const FILES = ['./', './index.html', './app.js?v=5', './style.css?v=5', './manifest.json', './icon-192.png', './icon-512.png'];
+const C = 'karnama-v6';
+const FILES = ['./', './index.html', './app.js?v=6', './style.css?v=6', './manifest.json', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
 });
