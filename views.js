@@ -404,7 +404,6 @@ document.getElementById('menu-categories').onclick=()=>{S.tab=4;S.cat=null;close
 document.getElementById('side-backup').onclick=()=>{closeMenu();doBackup()};
 document.getElementById('side-restore').onclick=()=>{closeMenu();if(impEl)impEl.click()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sideMenu.classList.contains('show'))closeMenu()});
-window.addEventListener('load',()=>setTimeout(()=>document.getElementById('app-splash').classList.add('hide'),500));
 
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
 

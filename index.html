@@ -7,18 +7,12 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json?v=31">
+<link rel="apple-touch-icon" href="icon-192.png?v=31">
 <title>کارنما</title>
-<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
-
-<div id="app-splash" aria-hidden="true">
-  <div class="splash-logo">ک</div>
-  <strong>کارنما</strong>
-  <span>نسخه ۳۰</span>
-</div>
 
 <header>
   <div>
@@ -45,7 +39,7 @@
 <div id="side-menu" aria-hidden="true">
   <button class="side-scrim" aria-label="بستن منو"></button>
   <aside class="side-panel" aria-label="منوی کارنما">
-    <div class="side-head"><div class="side-brand"><span>ک</span><b>کارنما</b></div><button id="menu-close" aria-label="بستن منو">×</button></div>
+    <div class="side-head"><div class="side-brand"><img src="logo-karnama.png" alt=""><span><b>کارنما</b><small>نسخه ۳۱</small></span></div><button id="menu-close" aria-label="بستن منو">×</button></div>
     <button class="side-link" id="menu-categories"><svg viewBox="0 0 24 24" fill="none"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span><b>دسته‌ها</b><small>دیدن کارها بر اساس موضوع</small></span><i>‹</i></button>
     <div class="side-section"><div class="side-title">پشتیبان‌گیری</div><p>یک نسخه از کارها و برنامه‌های مطالعه‌ات نگه دار.</p><div class="side-actions"><button id="side-backup">گرفتن فایل پشتیبان</button><button id="side-restore">بازیابی از فایل</button></div></div>
   </aside>
@@ -91,8 +85,8 @@
 <input type="file" id="imp" accept="application/json,.json" style="display:none">
 <div id="toast"></div>
 
-<script src="core.js?v=30"></script>
-<script src="study.js?v=30"></script>
-<script src="views.js?v=30"></script>
+<script src="core.js?v=31"></script>
+<script src="study.js?v=31"></script>
+<script src="views.js?v=31"></script>
 </body>
 </html>

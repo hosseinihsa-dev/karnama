@@ -22,8 +22,8 @@ jobs:
         run: |
           mkdir -p site
           cp index.html core.js study.js views.js style.css manifest.json sw.js site/
+          cp icon-192.png icon-512.png icon-maskable.png logo-karnama.png site/
           cp Vazirmatn-*.ttf site/
-          python3 make_icons.py site
           touch site/.nojekyll
           ls -la site
       - uses: actions/configure-pages@v5
