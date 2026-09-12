@@ -39,6 +39,9 @@ function render(){
       else if(a==='studyPause'){const p=studyById(id);if(p){p.paused=!p.paused;saveStudy();render();toast(p.paused?'برنامه متوقف شد.':'برنامه دوباره فعال شد.')}}
       else if(a==='studyExtend'){const p=studyById(id);if(p){p.endDate=nextStudyDate(p,addDays(TODAY(),1),6);saveStudy();render();toast('مهلت مطالعه هفت جلسه تمدید شد.')}}
       else if(a==='studyDelete')removeStudyWithUndo(id);
+      else if(a==='planPreview'){S.planPreview=true;render()}
+      else if(a==='planClose'){S.planPreview=false;render()}
+      else if(a==='planApprove'){approvePlan(list);S.planPreview=false;render();toast('برنامه امروز تأیید شد.',2800)}
     };
   });
 }
@@ -94,10 +97,11 @@ function todayView(overdue,list,doneN,today){
 }
 
 function plannerView(list,d){
-  const plan=dailyPlan(list),now=new Date(),nowMin=now.getHours()*60+now.getMinutes();
-  if(!plan.length)return `<section class="planner"><div class="planner-head"><div><b>برنامه پیشنهادی امروز</b><span>با ثبت اولین کار، زمان مناسبش را می‌چینم.</span></div></div></section>`;
+  const plan=dailyPlan(list),now=new Date(),nowMin=now.getHours()*60+now.getMinutes(),approved=approvedPlan(list);
+  if(!plan.length)return '';
+  if(!approved&&!S.planPreview)return `<button class="planner-trigger" data-act="planPreview" data-id="0"><span><b>برنامه پیشنهادی امروز</b><small>${fa(plan.length)} کار را برایت زمان‌بندی کردم</small></span><i>دیدن برنامه</i></button>`;
   const overflow=plan.filter(x=>x.overflow).length,collision=plan.filter(x=>x.collision).length;
-  let h=`<section class="planner"><div class="planner-head"><div><b>برنامه پیشنهادی امروز</b><span>کارهای ساعت‌دار ثابت‌اند؛ بقیه در زمان‌های خالی چیده شده‌اند.</span></div><em>${fa(plan.length)} بخش</em></div>`;
+  let h=`<section class="planner ${approved?'approved':''}"><div class="planner-head"><div><b>${approved?'برنامه امروز':'پیش‌نمایش برنامه امروز'}</b><span>کارهای ساعت‌دار ثابت‌اند؛ بقیه در زمان‌های خالی چیده شده‌اند.</span></div><em>${fa(plan.length)} بخش</em></div>`;
   if(overflow||collision)h+=`<div class="planner-warn">${collision?fa(collision)+' تداخل زمانی':''}${collision&&overflow?' · ':''}${overflow?fa(overflow)+' کار بیرون از بازه معمول':''} — برای سبک‌تر شدن روز، زمان یا روز یکی از کارها را تغییر بده.</div>`;
   h+='<div class="timeline">';
   plan.forEach(x=>{
@@ -108,7 +112,9 @@ function plannerView(list,d){
       <div class="plan-item"><button class="box" data-act="toggle" data-id="${x.t.id}" data-date="${d}" aria-label="انجام شد"></button>
         <div data-act="edit" data-id="${x.t.id}"><b>${esc(x.t.title)}</b><span>${CATS[x.t.c].name} · ${x.fixed?'ساعت ثابت':'زمان پیشنهادی'}${live?' · اکنون':''}</span></div></div></div>`;
   });
-  return h+'</div></section>';
+  h+='</div>';
+  if(!approved)h+=`<div class="planner-confirm"><button class="b-nu" data-act="planClose" data-id="0">فعلاً نه</button><button class="b-gold" data-act="planApprove" data-id="0">این برنامه خوبه</button></div>`;
+  return h+'</section>';
 }
 
 function tomorrowView(){

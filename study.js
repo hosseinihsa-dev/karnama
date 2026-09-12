@@ -34,7 +34,10 @@ function addStudyProgress(id,amount,date=TODAY()){
 }
 
 function studyToday(d){
-  const due=STUDY.filter(p=>studyRemaining(p)>0&&!p.paused&&studyActive(p,d));
+  const due=STUDY.filter(p=>{
+    const st=studyStats(p,d),expired=p.mode==='page'&&st.remaining>0&&d>p.endDate;
+    return st.remaining>0&&!p.paused&&studyActive(p,d)&&(st.target>0||expired);
+  });
   if(!due.length)return '';
   return `<div class="ghead"><b>مطالعه امروز</b><i></i><span>${fa(due.length)} کتاب</span></div>`+
     due.map(p=>studyCard(p,d,true)).join('');

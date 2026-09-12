@@ -109,7 +109,7 @@ function dailyPlan(list){
 
 /* ================= state ================= */
 const KEY='karnama.v1';
-let S={tab:0,sort:1,day:TODAY(),month:TODAY(),cat:null,sheet:false,pv:null,edit:null,tasks:null};
+let S={tab:0,sort:1,day:TODAY(),month:TODAY(),cat:null,sheet:false,pv:null,edit:null,planPreview:false,tasks:null};
 function load(){
   try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&Array.isArray(r.tasks))return r.tasks}catch(e){}
   const t=TODAY();
@@ -144,6 +144,14 @@ S.tasks=load();
 {const before=S.tasks.length;S.tasks=mergeSeries(S.tasks);
  if(S.tasks.length!==before)try{localStorage.setItem(KEY,JSON.stringify({tasks:S.tasks}))}catch(e){}}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({tasks:S.tasks}))}catch(e){}};
+const PLAN_KEY='karnama.plan.v1';
+const planSignature=list=>list.map(t=>[t.id,t.title,t.date,t.time||'',t.s,t.p].join(':')).sort().join('|');
+function approvedPlan(list){
+  try{const x=JSON.parse(localStorage.getItem(PLAN_KEY));return !!(x&&x.date===TODAY()&&x.signature===planSignature(list))}catch(e){return false}
+}
+function approvePlan(list){
+  try{localStorage.setItem(PLAN_KEY,JSON.stringify({date:TODAY(),signature:planSignature(list)}))}catch(e){}
+}
 
 /* ---- learning: remember the categories you correct by hand ---- */
 const LKEY='karnama.learn.v1';
