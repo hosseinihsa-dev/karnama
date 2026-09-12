@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>کارنما</title>
-<link rel="stylesheet" href="style.css?v=25">
+<link rel="stylesheet" href="style.css?v=26">
 </head>
 <body>
 
@@ -21,7 +21,7 @@
   </div>
   <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:none">
     <div id="logo">ک</div>
-    <span style="font:600 9px inherit;color:#5E6169">نسخه ۲۵</span>
+    <span style="font:600 9px inherit;color:#5E6169">نسخه ۲۶</span>
   </div>
 </header>
 
@@ -35,6 +35,7 @@
   <button data-tab="2"><i></i><span>هفته</span></button>
   <button data-tab="3"><i></i><span>ماه</span></button>
   <button data-tab="4"><i></i><span>دسته‌ها</span></button>
+  <button data-tab="5"><i></i><span>مطالعه</span></button>
 </nav>
 
 <div id="ov">
@@ -55,9 +56,28 @@
 </div>
 
 <div id="pick"><div class="bd"></div><div class="bx"></div></div>
+
+<div id="study-ov">
+  <div id="study-scrim"></div>
+  <div class="study-sheet">
+    <div class="grab"></div>
+    <div class="sh-t">برنامه مطالعه تازه</div>
+    <label class="field"><span>نام کتاب</span><input id="study-name" placeholder="مثلاً عادت‌های اتمی"></label>
+    <div class="study-grid">
+      <label class="field"><span>برنامه بر اساس</span><select id="study-mode"><option value="page">صفحه</option><option value="chapter">فصل</option></select></label>
+      <label class="field"><span id="study-total-label">تعداد کل صفحات</span><input id="study-total" inputmode="numeric" type="number" min="1"></label>
+      <label class="field"><span id="study-start-label">شروع از صفحه</span><input id="study-start" inputmode="numeric" type="number" min="1" value="1"></label>
+      <label class="field"><span id="study-pace-label">چند روز فرصت داری؟</span><input id="study-pace" inputmode="numeric" type="number" min="1"></label>
+    </div>
+    <fieldset class="study-days"><legend>روزهای مطالعه</legend><div id="study-day-list"></div></fieldset>
+    <div id="study-preview" class="study-preview"></div>
+    <button id="study-save">ساخت برنامه</button>
+    <div class="hint">برنامه هر روز با توجه به پیشرفت واقعی تو دوباره محاسبه می‌شود.</div>
+  </div>
+</div>
 <input type="file" id="imp" accept="application/json,.json" style="display:none">
 <div id="toast"></div>
 
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>
