@@ -147,7 +147,10 @@ function classify(text){
   const en=x=>x.replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
   const tm=t.match(/ساعت\s*([\d۰-۹]{1,2})\s*(?:[:.٫]\s*([\d۰-۹]{2}))?/)||t.match(/\b([\d۰-۹]{1,2})[:٫]([\d۰-۹]{2})\b/);
   if(tm){
-    const hh=parseInt(en(tm[1]),10),mm=tm[2]?parseInt(en(tm[2]),10):0;
+    let hh=parseInt(en(tm[1]),10);const mm=tm[2]?parseInt(en(tm[2]),10):0;
+    const isMorning=/صبح/.test(t),isNoon=/ظهر/.test(t),isPm=/عصر|بعدازظهر|بعد از ظهر|شب|امشب/.test(t);
+    if(isMorning&&hh===12)hh=0;
+    else if((isPm||isNoon)&&hh>=1&&hh<12)hh+=12;
     if(hh>=0&&hh<=23&&mm>=0&&mm<=59){
       time=hh+':'+String(mm).padStart(2,'0');
       s=hh<12?0:(hh<18?1:2);
@@ -187,7 +190,7 @@ function classify(text){
 
 /* ---- turn a free description into a short title ---- */
 const T_KILL=[
-  /^\s*(می‌?خوام|میخوام|می‌?خواهم|باید|لطفاً?|قراره|حتماً?|یادم باشه که|یادم باشه|یادآوری کن که|یادآوری کن)\s+/,
+  /^\s*(می‌?خوام|میخوام|می‌?خواهم|باید|لطفاً?|قراره|حتماً?|یادم باشه که|یادم باشه|یادم بنداز که|یادم بنداز|یادم بیار که|یادم بیار|یادآوریم کن که|یادآوریم کن|یادآوری کن که|یادآوری کن)\s+/,
 ];
 const T_WORDS=['پس فردا','پس‌فردا','امروز','فردا','امشب','دیشب','صبح','ظهر','بعدازظهر','بعد از ظهر','عصر','شب',
   'هر روز','هرروز','هر هفته','هرهفته','هر ماه','هرماه',
@@ -197,6 +200,7 @@ const T_WORDS=['پس فردا','پس‌فردا','امروز','فردا','امش
 function titleFrom(text){
   let t=(text||'').replace(/\s+/g,' ').trim();
   T_KILL.forEach(r=>{t=t.replace(r,'')});
+  t=t.replace(/(^|\s)(یادم\s*(?:بنداز|بیار)(?:\s*که)?|یادآوریم\s*کن(?:\s*که)?|یادآوری\s*کن(?:\s*که)?)(?=\s|$)/g,' ');
   t=t.replace(/ساعت\s*[\d۰-۹]+([:.٫][\d۰-۹]+)?/g,' ');
   t=t.replace(/\b[\d۰-۹]{1,2}[:٫][\d۰-۹]{2}\b/g,' ');
   t=t.replace(/تا\s*(آخر|پایان)\s*(این\s*)?(ماه|هفته)/g,' ');
@@ -219,8 +223,10 @@ function taskChips(t){
   if(t.rem)h+=`<span class="chip c-rem">یادآور</span>`;
   return h;
 }
-function toast(msg,ms=3800){
-  const e=document.getElementById('toast');e.textContent=msg;e.classList.add('show');
+function toast(msg,ms=3800,actionLabel=null,action=null){
+  const e=document.getElementById('toast');e.textContent=msg;
+  if(actionLabel&&action){const b=document.createElement('button');b.textContent=actionLabel;b.onclick=()=>{action();e.classList.remove('show')};e.appendChild(b)}
+  e.classList.add('show');
   clearTimeout(toast._t);toast._t=setTimeout(()=>e.classList.remove('show'),ms);
 }
 const byId=id=>S.tasks.find(t=>t.id===id);
@@ -231,7 +237,22 @@ function toggle(id,d){
   else t.done=!t.done;
   save();render();
 }
-function remove(id){S.tasks=S.tasks.filter(t=>t.id!==id);save();render()}
+function remove(id){
+  const index=S.tasks.findIndex(t=>t.id===id);if(index<0)return null;
+  const removed=S.tasks.splice(index,1)[0];save();render();return {task:removed,index};
+}
+function removeWithUndo(id){
+  const deleted=remove(id);if(!deleted)return;
+  toast('کار حذف شد.',6000,'برگردان',()=>{
+    if(S.tasks.some(t=>t.id===deleted.task.id))return;
+    S.tasks.splice(Math.min(deleted.index,S.tasks.length),0,deleted.task);save();render();toast('کار برگشت.',2200);
+  });
+}
+const norm=s=>String(s||'').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[‌\s]+/g,' ').trim().toLowerCase();
+function duplicateOf(task,exceptId=null){
+  return S.tasks.find(t=>t.id!==exceptId&&norm(t.title)===norm(task.title)&&t.date===task.date&&
+    (t.time||null)===(task.time||null)&&(t.rep||null)===(task.rep||null));
+}
 
 function taskCard(t,i){
   return `<div class="task">
@@ -258,7 +279,7 @@ function render(){
       else if(a==='today')patch(id,{date:TODAY()});
       else if(a==='tomorrow')patch(id,{date:addDays(TODAY(),1),moved:(byId(id).moved||0)+1});
       else if(a==='done')patch(id,{date:TODAY(),done:true});
-      else if(a==='drop'){remove(id);toast('حذف شد. بعضی کارها لازم نیستند.',3000)}
+      else if(a==='drop')removeWithUndo(id);
       else if(a==='allToday'){overdue.forEach(t=>t.date=TODAY());save();render()}
       else if(a==='sort'){S.sort=+el.dataset.v;render()}
       else if(a==='day'){S.day=el.dataset.v;render()}
@@ -555,19 +576,23 @@ sb.onclick=()=>{
   {const auto=classify(txt);if(g.c!==auto.c)learnCat(txt,g.c);}
   if(S.edit){
     const t=byId(S.edit);
-    if(t)Object.assign(t,{title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null});
+    const changes={title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null};
+    if(duplicateOf(changes,S.edit)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
+    if(t)Object.assign(t,changes);
     save();closeSheet();S.day=g.date;S.pv=null;S.edit=null;dr.value='';render();
     toast('تغییرات ذخیره شد.',2600);
     return;
   }
-  S.tasks.push({id:Date.now(),title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0});
+  const newTask={id:Date.now(),title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0};
+  if(duplicateOf(newTask)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
+  S.tasks.push(newTask);
   save();closeSheet();S.tab=g.date===addDays(today,1)?1:0;S.day=g.date;S.pv=null;dr.value='';render();
   toast(`اضافه شد به «${CATS[g.c].name}»${g.rep?' · '+g.rep+(g.until?' تا '+fa(jdate(g.until)):''):''} · پیشنهاد: ${dl} ${g.time?fa(g.time):SLOTS[g.s]}`);
 };
 
 document.getElementById('sh-del').onclick=()=>{
   if(!S.edit)return;
-  remove(S.edit);S.edit=null;closeSheet();toast('کار حذف شد.',2600);
+  const id=S.edit;S.edit=null;closeSheet();removeWithUndo(id);
 };
 
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===2)S.day=TODAY();if(S.tab===3){S.month=TODAY();S.day=TODAY()}if(S.tab===4)S.cat=null;render()});

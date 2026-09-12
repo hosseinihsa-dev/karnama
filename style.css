@@ -1,3 +1,10 @@
+@font-face{font-family:Vazirmatn;src:url('Vazirmatn-300.ttf') format('truetype');font-weight:300;font-display:swap}
+@font-face{font-family:Vazirmatn;src:url('Vazirmatn-400.ttf') format('truetype');font-weight:400;font-display:swap}
+@font-face{font-family:Vazirmatn;src:url('Vazirmatn-500.ttf') format('truetype');font-weight:500;font-display:swap}
+@font-face{font-family:Vazirmatn;src:url('Vazirmatn-600.ttf') format('truetype');font-weight:600;font-display:swap}
+@font-face{font-family:Vazirmatn;src:url('Vazirmatn-700.ttf') format('truetype');font-weight:700;font-display:swap}
+@font-face{font-family:Vazirmatn;src:url('Vazirmatn-800.ttf') format('truetype');font-weight:800;font-display:swap}
+
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;height:100%;overflow:hidden}
 body{
@@ -153,6 +160,7 @@ nav button.on span{color:#C9A227}
 #prev .chip:active{border-color:#3f434c}
 #submit{width:100%;height:52px;border-radius:18px;font:700 15px inherit;transition:all .2s;background:#1b1d23;color:#5E6169}
 #submit.on{background:linear-gradient(150deg,#C9A227,#a9821a);color:#151107}
+#toast button{border:0;border-radius:9px;margin-right:10px;padding:5px 10px;background:#C9A227;color:#151107;font:700 12px Vazirmatn;cursor:pointer}
 #sh-del{display:none;width:100%;padding:11px 0;border-radius:14px;background:#1e2027;color:#B0757C;font:600 12.5px inherit}
 .hint{text-align:center;font:400 11.5px/1.7 inherit;color:#6E7179}
 
