@@ -72,9 +72,44 @@ const bySlot=(a,b)=>{
   return a.p-b.p;
 };
 
+/* ---- daily planner: fixed appointments stay put; flexible tasks fill free gaps ---- */
+const SLOT_WINDOWS=[[8*60,13*60],[13*60,18*60],[18*60,22*60]];
+const CAT_DURATION=[60,45,120,45,60,45,45,30,60,60,30,25];
+const pn=s=>+String(s).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace('٫','.');
+function taskDuration(t){
+  const x=(t.note||t.title||'').replace(/یک\s*ساعت/g,'1 ساعت').replace(/دو\s*ساعت/g,'2 ساعت').replace(/سه\s*ساعت/g,'3 ساعت');
+  if(/نیم\s*ساعت/.test(x))return 30;
+  if(/ربع\s*ساعت/.test(x))return 15;
+  let m=x.match(/([\d۰-۹]+)\s*(?:دقیقه|دقه)/);if(m)return Math.max(5,Math.min(480,pn(m[1])));
+  m=x.match(/([\d۰-۹]+(?:[٫.]\d+)?)\s*ساعت/);if(m)return Math.max(15,Math.min(480,Math.round(pn(m[1])*60)));
+  return CAT_DURATION[t.c]||45;
+}
+const clock=m=>fa(`${String(Math.floor(m/60)%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`);
+function dailyPlan(list){
+  const active=list.filter(t=>!t.done),out=[],busy=[];
+  active.filter(t=>t.time).forEach(t=>{
+    const start=tmin(t),duration=taskDuration(t),end=start+duration;
+    out.push({t,start,end,duration,fixed:true,overflow:false});busy.push([start,end]);
+  });
+  busy.sort((a,b)=>a[0]-b[0]);
+  active.filter(t=>!t.time).sort((a,b)=>(a.s-b.s)||(a.p-b.p)).forEach(t=>{
+    const duration=taskDuration(t),w=SLOT_WINDOWS[t.s]||SLOT_WINDOWS[1];let start=w[0];
+    for(const b of busy){
+      if(b[1]<=start||b[0]>=w[1])continue;
+      if(start+duration<=b[0])break;
+      if(start<b[1])start=b[1];
+    }
+    const overflow=start+duration>w[1];
+    out.push({t,start,end:start+duration,duration,fixed:false,overflow});busy.push([start,start+duration]);busy.sort((a,b)=>a[0]-b[0]);
+  });
+  out.sort((a,b)=>a.start-b.start||a.t.p-b.t.p);
+  for(let i=1;i<out.length;i++)if(out[i].fixed&&out[i-1].end>out[i].start)out[i].collision=true;
+  return out;
+}
+
 /* ================= state ================= */
 const KEY='karnama.v1';
-let S={tab:0,sort:1,day:TODAY(),month:TODAY(),cat:null,sheet:false,pv:null,edit:null,tasks:null};
+let S={tab:0,sort:1,day:TODAY(),month:TODAY(),cat:null,sheet:false,pv:null,edit:null,planPreview:false,tasks:null};
 function load(){
   try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&Array.isArray(r.tasks))return r.tasks}catch(e){}
   const t=TODAY();
@@ -109,6 +144,14 @@ S.tasks=load();
 {const before=S.tasks.length;S.tasks=mergeSeries(S.tasks);
  if(S.tasks.length!==before)try{localStorage.setItem(KEY,JSON.stringify({tasks:S.tasks}))}catch(e){}}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({tasks:S.tasks}))}catch(e){}};
+const PLAN_KEY='karnama.plan.v1';
+const planSignature=list=>list.map(t=>[t.id,t.title,t.date,t.time||'',t.s,t.p].join(':')).sort().join('|');
+function approvedPlan(list){
+  try{const x=JSON.parse(localStorage.getItem(PLAN_KEY));return !!(x&&x.date===TODAY()&&x.signature===planSignature(list))}catch(e){return false}
+}
+function approvePlan(list){
+  try{localStorage.setItem(PLAN_KEY,JSON.stringify({date:TODAY(),signature:planSignature(list)}))}catch(e){}
+}
 
 /* ---- learning: remember the categories you correct by hand ---- */
 const LKEY='karnama.learn.v1';

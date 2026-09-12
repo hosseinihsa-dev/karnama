@@ -39,6 +39,9 @@ function render(){
       else if(a==='studyPause'){const p=studyById(id);if(p){p.paused=!p.paused;saveStudy();render();toast(p.paused?'برنامه متوقف شد.':'برنامه دوباره فعال شد.')}}
       else if(a==='studyExtend'){const p=studyById(id);if(p){p.endDate=nextStudyDate(p,addDays(TODAY(),1),6);saveStudy();render();toast('مهلت مطالعه هفت جلسه تمدید شد.')}}
       else if(a==='studyDelete')removeStudyWithUndo(id);
+      else if(a==='planPreview'){S.planPreview=true;render()}
+      else if(a==='planClose'){S.planPreview=false;render()}
+      else if(a==='planApprove'){approvePlan(list);S.planPreview=false;render();toast('برنامه امروز تأیید شد.',2800)}
     };
   });
 }
@@ -67,6 +70,7 @@ function todayView(overdue,list,doneN,today){
   h+=`<div class="prog"><div class="prog-top"><span class="prog-msg">${msg}</span><span class="prog-pct">${fa(pct)}٪</span></div>
       <div class="track"><div class="fill" style="width:${pct}%"></div></div></div>`;
   h+=studyToday(today);
+  h+=plannerView(list,today);
   const notes=['','صبح، بعدازظهر و شب — و در هر بازه، مهم‌ترین کار بالاتر','کارهای هم‌دسته پشت سر هم، تا یک‌جا تمامشان کنی'];
   h+=`<div><div class="seg">${['به ترتیب اولویت','به ترتیب زمان','بر اساس دسته'].map((s,i)=>
       `<button class="${S.sort===i?'on':''}" data-act="sort" data-v="${i}" data-id="0">${s}</button>`).join('')}</div>
@@ -90,6 +94,27 @@ function todayView(overdue,list,doneN,today){
     ?`الان بهترین وقت برای «${esc(next.title)}» است — ${next.time?fa(next.time):SLOTS[next.s]} و ${PRI[next.p]}.`
     :'کار باقی‌مانده‌ای نداری؛ یک کار از هفته را جلو بیانداز.'}</div>`;
   return h;
+}
+
+function plannerView(list,d){
+  const plan=dailyPlan(list),now=new Date(),nowMin=now.getHours()*60+now.getMinutes(),approved=approvedPlan(list);
+  if(!plan.length)return '';
+  if(!approved&&!S.planPreview)return `<button class="planner-trigger" data-act="planPreview" data-id="0"><span><b>برنامه پیشنهادی امروز</b><small>${fa(plan.length)} کار را برایت زمان‌بندی کردم</small></span><i>دیدن برنامه</i></button>`;
+  const overflow=plan.filter(x=>x.overflow).length,collision=plan.filter(x=>x.collision).length;
+  let h=`<section class="planner ${approved?'approved':''}"><div class="planner-head"><div><b>${approved?'برنامه امروز':'پیش‌نمایش برنامه امروز'}</b><span>کارهای ساعت‌دار ثابت‌اند؛ بقیه در زمان‌های خالی چیده شده‌اند.</span></div><em>${fa(plan.length)} بخش</em></div>`;
+  if(overflow||collision)h+=`<div class="planner-warn">${collision?fa(collision)+' تداخل زمانی':''}${collision&&overflow?' · ':''}${overflow?fa(overflow)+' کار بیرون از بازه معمول':''} — برای سبک‌تر شدن روز، زمان یا روز یکی از کارها را تغییر بده.</div>`;
+  h+='<div class="timeline">';
+  plan.forEach(x=>{
+    const live=d===TODAY()&&nowMin>=x.start&&nowMin<x.end;
+    h+=`<div class="plan-row ${live?'live':''} ${x.overflow||x.collision?'risk':''}">
+      <div class="plan-time"><b>${clock(x.start)}</b><span>${fa(x.duration)} دقیقه</span></div>
+      <i class="plan-line"><u></u></i>
+      <div class="plan-item"><button class="box" data-act="toggle" data-id="${x.t.id}" data-date="${d}" aria-label="انجام شد"></button>
+        <div data-act="edit" data-id="${x.t.id}"><b>${esc(x.t.title)}</b><span>${CATS[x.t.c].name} · ${x.fixed?'ساعت ثابت':'زمان پیشنهادی'}${live?' · اکنون':''}</span></div></div></div>`;
+  });
+  h+='</div>';
+  if(!approved)h+=`<div class="planner-confirm"><button class="b-nu" data-act="planClose" data-id="0">فعلاً نه</button><button class="b-gold" data-act="planApprove" data-id="0">این برنامه خوبه</button></div>`;
+  return h+'</section>';
 }
 
 function tomorrowView(){
@@ -199,12 +224,6 @@ function catView(){
       <svg viewBox="0 0 24 24"><path d="${c.ic}"/></svg></div>
       <div class="n">${c.name}</div><div class="c">${n?fa(n)+' کار':'خالی'}</div></div>`;
   }).join('')+'</div>';
-  g+=`<div class="sugg" style="display:flex;flex-direction:column;gap:11px">
-      <div><b>پشتیبان‌گیری: </b>کارها فقط روی همین گوشی ذخیره می‌شوند. هر از گاهی یک فایل پشتیبان بگیر تا با پاک‌شدن حافظه یا عوض‌کردن گوشی از دست نروند.</div>
-      <div style="display:flex;gap:8px">
-        <button class="b-gold" style="flex:1;padding:11px 0;border-radius:12px;font:600 12px inherit" data-act="backup" data-id="0">گرفتن فایل پشتیبان</button>
-        <button class="b-nu" style="flex:1;padding:11px 0;border-radius:12px;font:600 12px inherit" data-act="restore" data-id="0">بازیابی از فایل</button>
-      </div></div>`;
   return g;
 }
 
@@ -374,6 +393,18 @@ document.getElementById('sh-del').onclick=()=>{
 };
 
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===2)S.day=TODAY();if(S.tab===3){S.month=TODAY();S.day=TODAY()}if(S.tab===4)S.cat=null;render()});
+
+const sideMenu=document.getElementById('side-menu'),menuBtn=document.getElementById('menu-btn');
+function openMenu(){sideMenu.classList.add('show');sideMenu.setAttribute('aria-hidden','false');menuBtn.setAttribute('aria-expanded','true');document.body.classList.add('menu-open')}
+function closeMenu(){sideMenu.classList.remove('show');sideMenu.setAttribute('aria-hidden','true');menuBtn.setAttribute('aria-expanded','false');document.body.classList.remove('menu-open')}
+menuBtn.onclick=openMenu;
+document.getElementById('menu-close').onclick=closeMenu;
+sideMenu.querySelector('.side-scrim').onclick=closeMenu;
+document.getElementById('menu-categories').onclick=()=>{S.tab=4;S.cat=null;closeMenu();render()};
+document.getElementById('side-backup').onclick=()=>{closeMenu();doBackup()};
+document.getElementById('side-restore').onclick=()=>{closeMenu();if(impEl)impEl.click()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sideMenu.classList.contains('show'))closeMenu()});
+window.addEventListener('load',()=>setTimeout(()=>document.getElementById('app-splash').classList.add('hide'),500));
 
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
 
