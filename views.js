@@ -67,6 +67,7 @@ function todayView(overdue,list,doneN,today){
   h+=`<div class="prog"><div class="prog-top"><span class="prog-msg">${msg}</span><span class="prog-pct">${fa(pct)}٪</span></div>
       <div class="track"><div class="fill" style="width:${pct}%"></div></div></div>`;
   h+=studyToday(today);
+  h+=plannerView(list,today);
   const notes=['','صبح، بعدازظهر و شب — و در هر بازه، مهم‌ترین کار بالاتر','کارهای هم‌دسته پشت سر هم، تا یک‌جا تمامشان کنی'];
   h+=`<div><div class="seg">${['به ترتیب اولویت','به ترتیب زمان','بر اساس دسته'].map((s,i)=>
       `<button class="${S.sort===i?'on':''}" data-act="sort" data-v="${i}" data-id="0">${s}</button>`).join('')}</div>
@@ -90,6 +91,24 @@ function todayView(overdue,list,doneN,today){
     ?`الان بهترین وقت برای «${esc(next.title)}» است — ${next.time?fa(next.time):SLOTS[next.s]} و ${PRI[next.p]}.`
     :'کار باقی‌مانده‌ای نداری؛ یک کار از هفته را جلو بیانداز.'}</div>`;
   return h;
+}
+
+function plannerView(list,d){
+  const plan=dailyPlan(list),now=new Date(),nowMin=now.getHours()*60+now.getMinutes();
+  if(!plan.length)return `<section class="planner"><div class="planner-head"><div><b>برنامه پیشنهادی امروز</b><span>با ثبت اولین کار، زمان مناسبش را می‌چینم.</span></div></div></section>`;
+  const overflow=plan.filter(x=>x.overflow).length,collision=plan.filter(x=>x.collision).length;
+  let h=`<section class="planner"><div class="planner-head"><div><b>برنامه پیشنهادی امروز</b><span>کارهای ساعت‌دار ثابت‌اند؛ بقیه در زمان‌های خالی چیده شده‌اند.</span></div><em>${fa(plan.length)} بخش</em></div>`;
+  if(overflow||collision)h+=`<div class="planner-warn">${collision?fa(collision)+' تداخل زمانی':''}${collision&&overflow?' · ':''}${overflow?fa(overflow)+' کار بیرون از بازه معمول':''} — برای سبک‌تر شدن روز، زمان یا روز یکی از کارها را تغییر بده.</div>`;
+  h+='<div class="timeline">';
+  plan.forEach(x=>{
+    const live=d===TODAY()&&nowMin>=x.start&&nowMin<x.end;
+    h+=`<div class="plan-row ${live?'live':''} ${x.overflow||x.collision?'risk':''}">
+      <div class="plan-time"><b>${clock(x.start)}</b><span>${fa(x.duration)} دقیقه</span></div>
+      <i class="plan-line"><u></u></i>
+      <div class="plan-item"><button class="box" data-act="toggle" data-id="${x.t.id}" data-date="${d}" aria-label="انجام شد"></button>
+        <div data-act="edit" data-id="${x.t.id}"><b>${esc(x.t.title)}</b><span>${CATS[x.t.c].name} · ${x.fixed?'ساعت ثابت':'زمان پیشنهادی'}${live?' · اکنون':''}</span></div></div></div>`;
+  });
+  return h+'</div></section>';
 }
 
 function tomorrowView(){
