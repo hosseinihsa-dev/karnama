@@ -326,15 +326,19 @@ function picker(f){
               {v:addDays(today,14),l:'تا دو هفته دیگر',on:g.until===addDays(today,14)},
               {v:endOfJMonth(today),l:'تا آخر این ماه',on:g.until===endOfJMonth(today)},
               {v:addDays(today,90),l:'تا سه ماه دیگر',on:g.until===addDays(today,90)}];
-        for(let i=1;i<=60;i++){const d=addDays(today,i);
+        for(let i=1;i<=10;i++){const d=addDays(today,i);
           opts.push({v:d,l:'تا '+fa(WD[wdIndex(d)]+' '+jdate(d)),on:g.until===d})}}
   else if(f==='time'){title='ساعت';opts=[{v:'',l:'بدون ساعت',on:!g.time}];
         for(let hh=6;hh<=23;hh++)for(const mm of ['00','30']){const v=hh+':'+mm;opts.push({v:v,l:fa(v),on:g.time===v})}}
   else{title='روز';opts=[];for(let i=0;i<15;i++){const d=addDays(today,i);
         opts.push({v:d,l:i===0?'امروز':i===1?'فردا':fa(`${WD[wdIndex(d)]} ${jdate(d)}`),on:d===g.date})}}
-  pkbx.innerHTML=`<h4>${title}</h4>`+opts.map((o,i)=>
+  const calBtn=(f==='until'||f==='date')
+    ?`<button class="op cal-open" data-cal-open="1" style="color:#C9A227;background:rgba(201,162,39,.13);font-weight:700">انتخاب تاریخ دقیق از تقویم…</button>`:'';
+  pkbx.innerHTML=`<h4>${title}</h4>`+calBtn+opts.map((o,i)=>
     `<button class="op ${o.on?'on':''}" data-i="${i}">${o.color?`<span class="d5" style="width:7px;height:7px;border-radius:99px;background:${o.color}"></span>`:''}${o.l}</button>`).join('');
-  pkbx.querySelectorAll('.op').forEach((b,i)=>b.onclick=()=>{
+  const co=pkbx.querySelector('[data-cal-open]');
+  if(co)co.onclick=()=>{calAnchor=null;calPicker(f)};
+  pkbx.querySelectorAll('.op:not(.cal-open)').forEach((b,i)=>b.onclick=()=>{
     const val=opts[i].v;
     if(f==='rep')g.rep=REPS[val];
     else if(f==='until')g.until=val||null;
@@ -342,6 +346,39 @@ function picker(f){
     else g[f]=val;
     g.touched=true;pk.classList.remove('show');updatePv();
   });
+  pk.classList.add('show');
+}
+
+/* --- pick an exact day from a Jalali calendar --- */
+let calAnchor=null;
+function calPicker(f){
+  const g=S.pv,today=TODAY();
+  const cur=(f==='until'?g.until:g.date)||today;
+  if(!calAnchor)calAnchor=cur;
+  const jb=jparts(calAnchor);
+  const first=addDays(calAnchor,-(jb.d-1));
+  const days=[];let d=first;
+  while(days.length<32&&jparts(d).m===jb.m){days.push(d);d=addDays(d,1)}
+  const prev=addDays(first,-1),next=addDays(days[days.length-1],1);
+  let h=`<h4>${f==='until'?'تکرار تا کدام روز؟':'کار برای کدام روز؟'}</h4>
+    <div class="mhead" style="margin:2px 0 6px">
+      <button class="mnav" data-cal="${prev}">›</button>
+      <b>${JM[jb.m-1]} ${fa(jb.y)}</b>
+      <button class="mnav" data-cal="${next}">‹</button>
+    </div><div class="mgrid">`+WDS.map(w=>`<div class="mwd">${w}</div>`).join('');
+  for(let i=0;i<wdIndex(first);i++)h+='<div class="mcell blank"></div>';
+  days.forEach(x=>{
+    h+=`<button class="mcell ${x===cur?'on':''} ${x===today?'today':''}" data-pick="${x}"><span>${fa(jparts(x).d)}</span></button>`;
+  });
+  h+=`</div><button class="op" data-back="1" style="margin-top:6px">بازگشت به گزینه‌های سریع</button>`;
+  pkbx.innerHTML=h;
+  pkbx.querySelectorAll('[data-cal]').forEach(b=>b.onclick=()=>{calAnchor=b.dataset.cal;calPicker(f)});
+  pkbx.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
+    const v=b.dataset.pick;
+    if(f==='until')g.until=v;else g.date=v;
+    g.touched=true;calAnchor=null;pk.classList.remove('show');updatePv();
+  });
+  pkbx.querySelector('[data-back]').onclick=()=>{calAnchor=null;picker(f)};
   pk.classList.add('show');
 }
 
