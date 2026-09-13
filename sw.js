@@ -1,8 +1,8 @@
-const C = 'karnama-v31';
-const FILES = ['./', './index.html', './core.js?v=31', './study.js?v=31', './views.js?v=31', './style.css?v=31', './manifest.json?v=31', './icon-192.png?v=31', './icon-512.png?v=31', './icon-maskable.png?v=31', './logo-karnama.png',
+const C = 'karnama-v32';
+const FILES = ['./', './index.html', './core.js?v=32', './study.js?v=32', './views.js?v=32', './style.css?v=32', './manifest.json?v=32', './icon-192.png?v=32', './icon-512.png?v=32', './icon-maskable.png?v=32', './logo-karnama.png?v=32',
   './Vazirmatn-300.ttf', './Vazirmatn-400.ttf', './Vazirmatn-500.ttf', './Vazirmatn-600.ttf', './Vazirmatn-700.ttf', './Vazirmatn-800.ttf'];
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(C).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(C).then(c => Promise.all(FILES.map(f => c.add(f).catch(() => {})))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim()));

@@ -7,7 +7,7 @@ const CATS=[
  {name:'کار و شغل',h:210,kw:['ایمیل','پروژه','گزارش','رئیس','ددلاین','ارسال','ارائه','همکار'],ic:'M20 6h-4V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2m-6 0h-4V4h4z'},
  {name:'خانه و خانواده',h:20,kw:['مامان','بابا','خانه','خونه','تعمیر','نظافت','مهمان','ظرف'],ic:'M12 3 3 10v10a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-5h4v5a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1V10z'},
  {name:'ورزش و سلامتی',h:130,kw:['ورزش','باشگاه','دویدن','پیاده‌روی','پیاده روی','آب بخورم','خواب','قرص','دارو'],ic:'M20.6 8.4 19 6.8V5a2 2 0 0 0-4 0v3H9V5a2 2 0 0 0-4 0v1.8L3.4 8.4a1 1 0 0 0 1.4 1.4l.2-.2v4.8l-.2-.2a1 1 0 0 0-1.4 1.4L5 17.2V19a2 2 0 0 0 4 0v-3h6v3a2 2 0 0 0 4 0v-1.8l1.6-1.6a1 1 0 0 0-1.4-1.4l-.2.2V9.6l.2.2a1 1 0 0 0 1.4-1.4'},
- {name:'مالی و پرداخت',h:95,kw:['قسط','پرداخت','قبض','حساب','پول','بیمه','مالیات','واریز','کارت'],ic:'M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2m0 14H4v-6h16zm0-9H4V6h16z'},
+ {name:'مالی و پرداخت',h:95,kw:['قسط','پرداخت','قبض','حساب','پول','بیمه','مالیات','واریز','کارت','بانک','وام','اجاره'],ic:'M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2m0 14H4v-6h16zm0-9H4V6h16z'},
  {name:'سفر',h:190,kw:['سفر','بلیت','بلیط','هتل','چمدان','ویزا','پرواز','مسافرت'],ic:'M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z'},
  {name:'یادگیری',h:285,kw:['یاد بگیرم','دوره','تمرین زبان','آموزش','انگلیسی','کد','بیاموزم','درس'],ic:'M12 3 1 9l11 6 9-4.9V17a1 1 0 0 0 2 0V9zM5 13.2V17c0 1.7 3.1 3 7 3s7-1.3 7-3v-3.8l-7 3.8z'},
  {name:'معنوی و عبادت',h:170,kw:['نماز','قرآن','دعا','روزه','زیارت','ذکر','مسجد'],ic:'M12 2S8 5.5 8 8.5c0 1.6.9 2.8 2 3.5H6a3 3 0 0 0-3 3V21h4v-3a2 2 0 0 1 4 0v3h2v-3a2 2 0 0 1 4 0v3h4v-6a3 3 0 0 0-3-3h-4c1.1-.7 2-1.9 2-3.5C16 5.5 12 2 12 2'},
@@ -85,7 +85,9 @@ function taskDuration(t){
   return CAT_DURATION[t.c]||45;
 }
 const clock=m=>fa(`${String(Math.floor(m/60)%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`);
-function dailyPlan(list){
+function dailyPlan(list,fromMin){
+  /* by default nothing is scheduled into the past: start from the current clock */
+  if(fromMin===undefined){const n=new Date();fromMin=n.getHours()*60+n.getMinutes()}
   const active=list.filter(t=>!t.done),out=[],busy=[];
   active.filter(t=>t.time).forEach(t=>{
     const start=tmin(t),duration=taskDuration(t),end=start+duration;
@@ -94,10 +96,11 @@ function dailyPlan(list){
   busy.sort((a,b)=>a[0]-b[0]);
   active.filter(t=>!t.time).sort((a,b)=>(a.s-b.s)||(a.p-b.p)).forEach(t=>{
     const duration=taskDuration(t),w=SLOT_WINDOWS[t.s]||SLOT_WINDOWS[1];let start=w[0];
+    if(fromMin!==null&&fromMin>start)start=Math.ceil(fromMin/5)*5;
     for(const b of busy){
-      if(b[1]<=start||b[0]>=w[1])continue;
+      if(b[1]<=start)continue;
       if(start+duration<=b[0])break;
-      if(start<b[1])start=b[1];
+      start=b[1];
     }
     const overflow=start+duration>w[1];
     out.push({t,start,end:start+duration,duration,fixed:false,overflow});busy.push([start,start+duration]);busy.sort((a,b)=>a[0]-b[0]);
@@ -249,6 +252,7 @@ function titleFrom(text){
   t=t.replace(/تا\s*(آخر|پایان)\s*(این\s*)?(ماه|هفته)/g,' ');
   t=t.replace(/تا\s*[\d۰-۹]{1,3}\s*(روز|هفته|ماه)\s*(دیگه|بعد|آینده)?/g,' ');
   T_WORDS.slice().sort((a,b)=>b.length-a.length).forEach(w=>{t=t.split(w).join(' ')});
+  t=t.replace(/(^|\s)(نیم|ربع|یک|دو|سه|چهار|پنج|شش|[\d۰-۹]+)\s*(ساعته|ساعت|دقیقه‌ای|دقیقه|دقه)(?=\s|$)/g,' ');
   t=t.replace(/(^|\s)هر(\s|$)/g,' ');
   t=t.replace(/\s+/g,' ').replace(/^[\s,،.\-–—]+|[\s,،.\-–—]+$/g,'');
   t=t.replace(/^(که|را|رو|در|به|از)\s+/,'');
