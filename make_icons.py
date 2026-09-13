@@ -1,38 +1,74 @@
-"""می‌سازد: آیکون‌های کارنما از روی نقاب برداری لوگو.
+"""ساخت آیکون‌های کارنما — بدون هیچ کتابخانه‌ی بیرونی.
 اجرا: python3 make_icons.py <پوشه‌ی مقصد>
 """
-import base64, io, sys
-from PIL import Image
+import base64, struct, sys, zlib
 
 BG = (16, 16, 19)
 GOLD = (208, 167, 35)
+MW, MH = 640, 514
+MASK_B64 = "eNrt28ERggAQBEHzTxoz8IGUg2xPBtx28aE4jk+9pC87Lskd9WNyOOpG5CjUbeRBqFweidwxKPQYZI9BoUcheQwKPgLZo1DoIQgfgqIPQfYY1LQ9BOkjUNv4IGSPQPiEIH0Iwoeg6AMQPgRFH4LwESj6CKQPQbFHIH4Eij4C4UNQ9AFIH4GiD0H6CKRPANJHIH1CkD4A6ROB9CFInwjED0D6BCB9CNInAPEjkD4BSB+B9IlA/AikTwTiByB9AtDQBMKnRYAWJhA/TQo0LYD4aRKgVQHET5MC7UkgfZoEaEkC8dMmQCMSiJ8mAZoPQPw0CdByBOKnSYA2AxA/bQo0F4D4aVOgpQDET5sArQQgfZoEaCAA8dMkQNsQiJ82AZoFQPo0CdAiAOKnTYHGABA/TQK0A4D4aROgDQDET5sCnV/4aROg0ysE6PAKATq7QoCOrhCgkysE6OAKATq3QoCOrRCgUysE6NAKATqzQoFurBCgCysE6L4KAbquQn+OqxCg0yoE6LAKATqrQoCOqhCgkyoE6KAKATqnQoCOqRCgUyoE6JAKATqjQn+uqBCgG6oE6IQKATqgQoDOp9Cf6ykE6HYKAbrcqeO6yUUAHe7rMzraeYDOdlz1CdMZ3SyB56xnr8md31jDs6LHYHlc10EwPLHLUBie2UkQDK/tHAiWF3cLCMObOwOB4eWdAMHw+vQRGA4AH4PhBuwhGA5BH4HlFvQhGM7BHoLhJPgBGI5CH4HlLvAxGG5DH4DhPPQRWC5EH4LhRvQBGM5EH4HhUvAhGI5FH4HlXvgBGC5GH4D80bdG8FmPQeB/LocfgOF09BFYzkcfgOGA9BEo/Aikj0DhByB9AAo/AukDUPQRiB+Awo9A/ACkTwDiByB9AhA/AvETgPQRiJ8AxA9A/AgUfQDiB6DwAxA/AIUfgfgBKPwAxA9A0QcgfgDiJwDxAxA/AYgfgPgJQPwAxE8A4gcgfgIQPwDxE4D4AYifAMQPQPwEIH8A4icA8QMQP/GHH4D4CUD8AMQPQPwEIH784ScA+QMQPwGIH3/4CUD+AORPAOLHH34CkD8A8ROA+AHIn/jDD0D8BCB+/OEnAPkDED/N+7MwgPxpFKB5AeRPo/6MCyB+GgVoWf7w0yZAs/LHn0YBGpU//DQK0KQA4if+BCB+GvJnTQD50yhAU/LHn0YBGpI//jQK0Iz84adRgEbkjz+NAjQhgPxp1J8BAcRP/AlA/rTkz3gA8qdRf6bjjz+NAjQcf/hpFKDZ+ONPowCNxh9/GgVoMv7wE38CkD8t+bMXgPxpFaC18MNPowCNxR9+GgVoKv740yhAQ/HHn1YB2ok//MSf+ONPSwCNxB9/GvVnIwD5E38CkD9N+TMQf/yJPwGIn/gTf/jp+QCNwx9/4k8A4if+xB9/GgBoGf7wE3/ijz/xJwDxE3/ijz891J9VAORP/Ik//sSfAORPA/5Mwh9/4k8A8ifvP/GHnwYAGoQ//sSf+ONPU/7sASB/4k/88acpf9bgjz/xJwD5E3/ijz/xJ/74E3/ijz899DSAtuCPP/En/vgTf+IPP/En/vgTf+KPP/En/vgTf+KPP/En/vgTf+KPP/En/vgTf+KPP/En/vgTf+KPP/74408A4o8//sSf+ONP/Ik//sSf+ONP/Ik//sSf+ONP/Ik//sSf+ONP/Ik//sSf+ONP/Ik//sSf+ONP/PEn/vgTf+KPP/74E3/ijz/xx5/440/88Sf++BN//Ik//sQff+KPP/HHn/jjT/zxJ/74E3/8iT/++ONP/PHHn/jjjz/xxx9/4o8//sQff/yJP/74E3/8iT/+xB9/4o8/8cef+ONP/PEn/vjjjz/xx5/440/88cef+ONP/PEn/vgTf/yJP/7EH3/ijz/xx5/440/88Sf++ONP/PEn/vjjjz/+xB9//Ik//vgTf/yJP/7EH3/ijz/xx5/440/88Sf++BN//Ik//sQff/yJP/74E3/88Zf1BsEtcuI="
 
-MASK_B64 = "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"
 
-def mark():
-    return Image.open(io.BytesIO(base64.b64decode(MASK_B64))).convert("L")
+def mask():
+    return zlib.decompress(base64.b64decode(MASK_B64))
+
+
+def scaled_alpha(m, nw, nh):
+    """نقاب را با میانگین‌گیری مساحتی کوچک می‌کند تا لبه‌ها نرم بماند."""
+    out = bytearray(nw * nh)
+    for y in range(nh):
+        y0, y1 = y * MH // nh, max(y * MH // nh + 1, (y + 1) * MH // nh)
+        for x in range(nw):
+            x0, x1 = x * MW // nw, max(x * MW // nw + 1, (x + 1) * MW // nw)
+            total = 0
+            for yy in range(y0, y1):
+                row = yy * MW
+                total += sum(m[row + x0:row + x1])
+            out[y * nw + x] = total // ((y1 - y0) * (x1 - x0))
+    return out
+
+
+def png(size, rows):
+    def chunk(tag, data):
+        body = tag + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+    head = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", head)
+            + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b""))
+
 
 def build(size, ratio):
-    m = mark()
+    m = mask()
     target = int(size * ratio)
-    w, h = m.size
-    scale = target / max(w, h)
-    nw, nh = max(1, round(w * scale)), max(1, round(h * scale))
-    # supersample then shrink => smooth edges
-    big = m.resize((nw * 4, nh * 4), Image.LANCZOS).resize((nw, nh), Image.LANCZOS)
-    canvas = Image.new("RGB", (size, size), BG)
-    gold = Image.new("RGB", (nw, nh), GOLD)
-    canvas.paste(gold, ((size - nw) // 2, (size - nh) // 2), big)
-    return canvas.quantize(colors=24)
+    nw = target
+    nh = max(1, round(MH * target / MW))
+    alpha = scaled_alpha(m, nw, nh)
+    ox, oy = (size - nw) // 2, (size - nh) // 2
+    rows = bytearray()
+    for y in range(size):
+        rows.append(0)  # filter: none
+        inside_y = oy <= y < oy + nh
+        for x in range(size):
+            a = alpha[(y - oy) * nw + (x - ox)] if inside_y and ox <= x < ox + nw else 0
+            if a == 0:
+                rows += bytes(BG)
+            elif a == 255:
+                rows += bytes(GOLD)
+            else:
+                rows += bytes((BG[i] + (GOLD[i] - BG[i]) * a // 255) for i in range(3))
+    return png(size, bytes(rows))
+
 
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "."
-    # maskable: لوگو ۵۰% پهنا => ۲۵% فضای تنفس از هر طرف (safe zone اندروید)
-    build(512, 0.50).save(f"{out}/icon-maskable.png", optimize=True)
-    build(512, 0.62).save(f"{out}/icon-512.png", optimize=True)
-    build(192, 0.62).save(f"{out}/icon-192.png", optimize=True)
-    build(512, 0.70).save(f"{out}/logo-karnama.png", optimize=True)
+    # maskable: لوگو ۵۰٪ پهنا => ۲۵٪ فضای تنفس از هر طرف (safe zone اندروید)
+    specs = [("icon-maskable.png", 512, 0.50), ("icon-512.png", 512, 0.62),
+             ("icon-192.png", 192, 0.62), ("logo-karnama.png", 512, 0.70)]
+    for name, size, ratio in specs:
+        with open(f"{out}/{name}", "wb") as f:
+            f.write(build(size, ratio))
     print("icons written to", out)
+
 
 if __name__ == "__main__":
     main()
