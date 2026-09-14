@@ -226,7 +226,9 @@ nav button.on span{color:#C9A227}
 .study-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .field{display:flex;flex-direction:column;gap:6px}.field>span,.study-days legend{font:600 11px inherit;color:#8E9199}
 .field input,.field select{width:100%;height:44px;border-radius:12px;background:#1b1d23;border:1px solid #2d2f37;padding:0 11px;font:500 13px inherit;color:#EEECE7;outline:none}
-.field input:focus,.field select:focus{border-color:#C9A227}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#C9A227}
+.field input[readonly]{color:#c9a227;background:rgba(201,162,39,.07)}
+.chapter-titles{display:none}.chapter-titles textarea{width:100%;min-height:112px;resize:vertical;border-radius:13px;background:#1b1d23;border:1px solid #2d2f37;padding:10px 12px;font:500 12.5px/1.8 inherit;color:#eeece7;outline:none;direction:rtl}.chapter-titles textarea::placeholder{color:#62656d}.chapter-titles small{font:400 10px/1.6 inherit;color:#777a83}
 .study-days{margin:0;padding:0;border:0}.study-days div{display:flex;gap:5px;margin-top:7px}.study-days label{flex:1;position:relative}.study-days input{position:absolute;opacity:0}.study-days span{display:block;text-align:center;padding:8px 2px;border-radius:10px;background:#1b1d23;border:1px solid #292b32;font:600 10px inherit;color:#858891}.study-days input:checked+span{color:#C9A227;border-color:#C9A227;background:rgba(201,162,39,.1)}
 .study-preview{min-height:43px;padding:10px 12px;border-radius:13px;background:#1b1d23;font:500 11.5px/1.7 inherit;color:#A7A9AF}
 #study-save{height:50px;border-radius:16px;background:#C9A227;color:#151107;font:700 14px inherit}

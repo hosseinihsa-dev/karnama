@@ -36,7 +36,6 @@ function render(){
       else if(a==='studyAdd')openStudySheet();
       else if(a==='studyDone'){const p=studyById(id),st=p&&studyStats(p);if(p&&st.target)addStudyProgress(id,st.target)}
       else if(a==='studyProgress')amountPicker(id);
-      else if(a==='studyPause'){const p=studyById(id);if(p){p.paused=!p.paused;saveStudy();render();toast(p.paused?'برنامه متوقف شد.':'برنامه دوباره فعال شد.')}}
       else if(a==='studyExtend'){const p=studyById(id);if(p){p.endDate=nextStudyDate(p,addDays(TODAY(),1),6);saveStudy();render();toast('مهلت مطالعه هفت جلسه تمدید شد.')}}
       else if(a==='studyDelete')removeStudyWithUndo(id);
       else if(a==='planPreview'){S.planPreview=true;render()}
@@ -129,7 +128,7 @@ function tomorrowView(){
   const list=instOn(d);
   const sorted=[...list].sort(bySlot);
   let h=`<div class="dayhead">فردا — ${fa(WD[wdIndex(d)]+' '+jdate(d))} · ${fa(list.length)} کار</div>`;
-  const books=STUDY.filter(p=>studyRemaining(p)>0&&!p.paused&&studyActive(p,d));
+  const books=STUDY.filter(p=>studyRemaining(p)>0&&studyActive(p,d));
   if(books.length)h+=`<div class="ghead"><b>مطالعه</b><i></i><span>${fa(books.length)} کتاب</span></div><div class="study-strip">${books.map(p=>studyCard(p,d)).join('')}</div>`;
   let lh='';
   sorted.forEach((t,i)=>{
@@ -144,7 +143,7 @@ function tomorrowView(){
 
 function dayList(d){
   const dt=instOn(d).sort(bySlot);
-  const books=STUDY.filter(p=>studyRemaining(p)>0&&!p.paused&&studyActive(p,d));
+  const books=STUDY.filter(p=>studyRemaining(p)>0&&studyActive(p,d));
   let h=`<div class="dayhead">${fa(WD[wdIndex(d)]+' '+jdate(d))} — ${fa(dt.length)} کار${books.length?' · '+fa(books.length)+' مطالعه':''}</div>`;
   if(books.length)h+=`<div class="study-strip">${books.map(p=>studyCard(p,d)).join('')}</div>`;
   if(!dt.length&&!books.length)return h+'<div class="empty">این روز خالیه. یک روز آزاد هم لازمه.</div>';
