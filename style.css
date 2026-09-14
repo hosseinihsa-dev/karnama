@@ -219,6 +219,7 @@ nav button.on span{color:#C9A227}
 .study-days{margin:0;padding:0;border:0}.study-days div{display:flex;gap:5px;margin-top:7px}.study-days label{flex:1;position:relative}.study-days input{position:absolute;opacity:0}.study-days span{display:block;text-align:center;padding:8px 2px;border-radius:10px;background:#1b1d23;border:1px solid #292b32;font:600 10px inherit;color:#858891}.study-days input:checked+span{color:#C9A227;border-color:#C9A227;background:rgba(201,162,39,.1)}
 .study-preview{min-height:43px;padding:10px 12px;border-radius:13px;background:#1b1d23;font:500 11.5px/1.7 inherit;color:#A7A9AF}
 #study-save{height:50px;border-radius:16px;background:#C9A227;color:#151107;font:700 14px inherit}
+.date-quick{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px}.date-quick button{min-height:42px;padding:8px;border-radius:12px;background:#1b1d23;border:1px solid #2d2f37;color:#bbbcc1;font:600 11px inherit;transition:background .18s,border-color .18s,color .18s}.date-quick button.on,.date-quick button:focus-visible{outline:none;color:#E8C551;border-color:#C9A227;background:rgba(201,162,39,.1)}
 @media(max-width:390px){nav{gap:1px;padding-left:6px;padding-right:6px}nav span{font-size:10px}.study-grid{grid-template-columns:1fr}.plan-row{grid-template-columns:47px 10px 1fr;gap:6px}.planner{padding:13px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 

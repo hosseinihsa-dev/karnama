@@ -321,6 +321,7 @@ const pk=document.getElementById('pick'),pkbx=pk.querySelector('.bx');
 pk.querySelector('.bd').onclick=()=>pk.classList.remove('show');
 function picker(f){
   const g=S.pv,today=TODAY();
+  if(f==='date'){calAnchor=null;calPicker(f);return}
   let title,opts;
   if(f==='c'){title='دسته';opts=CATS.map((c,i)=>({v:i,l:c.name,on:i===g.c,color:col(c.h)}))}
   else if(f==='s'){title='زمان روز';opts=SLOTS.map((s,i)=>({v:i,l:s,on:i===g.s}))}
@@ -373,7 +374,14 @@ function calPicker(f){
   const days=[];let d=first;
   while(days.length<32&&jparts(d).m===jb.m){days.push(d);d=addDays(d,1)}
   const prev=addDays(first,-1),next=addDays(days[days.length-1],1);
-  let h=`<h4>${f==='until'?'تکرار تا کدام روز؟':'کار برای کدام روز؟'}</h4>
+  const endWeek=addDays(weekStart(today),6),nextWeek=addDays(endWeek,1);
+  const quick=f==='date'?`<div class="date-quick">
+      <button data-quick="${today}" class="${cur===today?'on':''}">امروز</button>
+      <button data-quick="${addDays(today,1)}" class="${cur===addDays(today,1)?'on':''}">فردا</button>
+      <button data-quick="${endWeek}" class="${cur===endWeek?'on':''}">آخر این هفته</button>
+      <button data-quick="${nextWeek}" class="${cur===nextWeek?'on':''}">شنبه آینده</button>
+    </div>`:'';
+  let h=`<h4>${f==='until'?'تکرار تا کدام روز؟':'کار برای کدام روز؟'}</h4>${quick}
     <div class="mhead" style="margin:2px 0 6px">
       <button class="mnav" data-cal="${prev}">›</button>
       <b>${JM[jb.m-1]} ${fa(jb.y)}</b>
@@ -383,15 +391,19 @@ function calPicker(f){
   days.forEach(x=>{
     h+=`<button class="mcell ${x===cur?'on':''} ${x===today?'today':''}" data-pick="${x}"><span>${fa(jparts(x).d)}</span></button>`;
   });
-  h+=`</div><button class="op" data-back="1" style="margin-top:6px">بازگشت به گزینه‌های سریع</button>`;
+  h+=`</div>${f==='until'?'<button class="op" data-back="1" style="margin-top:6px">بازگشت به گزینه‌های سریع</button>':''}`;
   pkbx.innerHTML=h;
+  pkbx.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>{
+    g.date=b.dataset.quick;g.touched=true;calAnchor=null;pk.classList.remove('show');updatePv();
+  });
   pkbx.querySelectorAll('[data-cal]').forEach(b=>b.onclick=()=>{calAnchor=b.dataset.cal;calPicker(f)});
   pkbx.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
     const v=b.dataset.pick;
     if(f==='until')g.until=v;else g.date=v;
     g.touched=true;calAnchor=null;pk.classList.remove('show');updatePv();
   });
-  pkbx.querySelector('[data-back]').onclick=()=>{calAnchor=null;picker(f)};
+  const back=pkbx.querySelector('[data-back]');
+  if(back)back.onclick=()=>{calAnchor=null;picker(f)};
   pk.classList.add('show');
 }
 
