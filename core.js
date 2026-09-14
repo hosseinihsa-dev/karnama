@@ -62,11 +62,15 @@ function occursOn(t,d){
 }
 const isDone=(t,k)=>t.rep?!!(t.doneOn&&t.doneOn[k]):!!t.done;
 /* an every-N-hours task shows several times a day, each dose on its own line */
-function doseTimes(t){
+function doseTimes(t,d){
   const every=Math.max(1,Math.min(24,+t.every||8))*60;
   const start=t.time?(+t.time.split(':')[0]*60+ +t.time.split(':')[1]):8*60;
+  const dayOffset=Math.max(0,diffDays(d,t.date))*1440;
+  const firstOccurrence=start+Math.max(0,Math.ceil((dayOffset-start)/every))*every;
   const out=[];
-  for(let m=start%every;m<1440;m+=every)out.push(String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));
+  for(let m=firstOccurrence-dayOffset;m<1440;m+=every){
+    if(m>=0)out.push(String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));
+  }
   return out;
 }
 const slotOfTime=v=>{const hh=+v.split(':')[0];return hh<12?0:(hh<18?1:2)};
@@ -75,7 +79,7 @@ function instOn(d){
   S.tasks.forEach(t=>{
     if(!occursOn(t,d))return;
     if(t.rep===REP_H){
-      const times=doseTimes(t);
+      const times=doseTimes(t,d);
       times.forEach((v,i)=>{
         const k=d+'@'+v;
         out.push(Object.assign({},t,{date:d,time:v,s:slotOfTime(v),key:k,done:isDone(t,k),doseN:i+1,doseAll:times.length}));
@@ -284,6 +288,7 @@ function titleFrom(text){
   t=t.replace(/(^|\s)هر(\s|$)/g,' ');
   t=t.replace(/\s+/g,' ').replace(/^[\s,،.\-–—]+|[\s,،.\-–—]+$/g,'');
   t=t.replace(/^(که|را|رو|در|به|از)\s+/,'');
+  t=t.replace(/\s+(از|در|به)\s*$/,'');
   const w=t.split(' ').filter(Boolean);
   if(w.length>8)t=w.slice(0,8).join(' ')+'…';
   t=t.trim();
