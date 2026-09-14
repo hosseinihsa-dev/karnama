@@ -321,6 +321,8 @@ const pk=document.getElementById('pick'),pkbx=pk.querySelector('.bx');
 pk.querySelector('.bd').onclick=()=>pk.classList.remove('show');
 function picker(f){
   const g=S.pv,today=TODAY();
+  pk.classList.toggle('cat-mode',f==='c');
+  pkbx.classList.toggle('cat-mode',f==='c');
   if(f==='date'||f==='until'){calAnchor=null;calPicker(f);return}
   let title,opts;
   if(f==='c'){
