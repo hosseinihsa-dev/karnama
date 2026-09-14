@@ -34,6 +34,7 @@ function render(){
       else if(a==='backup')doBackup();
       else if(a==='restore'){const i=document.getElementById('imp');if(i)i.click()}
       else if(a==='studyAdd')openStudySheet();
+      else if(a==='studyEdit')editStudySheet(id);
       else if(a==='studyDone'){const p=studyById(id),st=p&&studyStats(p);if(p&&st.target)addStudyProgress(id,st.target)}
       else if(a==='studyProgress')amountPicker(id);
       else if(a==='studyExtend'){const p=studyById(id);if(p){p.endDate=nextStudyDate(p,addDays(TODAY(),1),6);saveStudy();render();toast('مهلت مطالعه هفت جلسه تمدید شد.')}}

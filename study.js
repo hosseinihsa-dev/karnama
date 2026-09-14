@@ -57,7 +57,7 @@ function studyCard(p,d=TODAY(),today=false){
     <div class="track"><div class="fill" style="width:${st.pct}%"></div></div>
     <div class="study-target">${target}</div>
     <div class="study-meta"><span>${studyUnit(p,st.remaining)} باقی مانده</span><span>پایان: ${fa(jdate(displayFinish))}</span></div>
-    ${isCurrent?`<div class="study-actions">${st.target?`<button class="b-gold" data-act="studyDone" data-id="${p.id}">مطالعه کردم</button>`:''}${expired?`<button class="b-gold" data-act="studyExtend" data-id="${p.id}">تمدید ۷ جلسه</button>`:''}<button class="b-nu" data-act="studyProgress" data-id="${p.id}">ثبت مقدار</button>${today?'':`<button class="study-danger" data-act="studyDelete" data-id="${p.id}">حذف برنامه</button>`}</div>`:''}</div>`;
+    ${isCurrent?`<div class="study-actions">${st.target?`<button class="b-gold" data-act="studyDone" data-id="${p.id}">مطالعه کردم</button>`:''}${expired?`<button class="b-gold" data-act="studyExtend" data-id="${p.id}">تمدید ۷ جلسه</button>`:''}<button class="b-nu" data-act="studyProgress" data-id="${p.id}">ثبت مقدار</button>${today?'':`<button class="b-nu" data-act="studyEdit" data-id="${p.id}">ویرایش برنامه</button><button class="study-danger" data-act="studyDelete" data-id="${p.id}">حذف برنامه</button>`}</div>`:''}</div>`;
 }
 
 function studyView(){
@@ -78,15 +78,26 @@ function removeStudyWithUndo(id){
 const studyOv=document.getElementById('study-ov'),studyMode=document.getElementById('study-mode'),studyPlanKind=document.getElementById('study-plan-kind');
 const studyInputs=['study-name','study-total','study-start','study-pace'].map(id=>document.getElementById(id));
 const studyChapterTitles=document.getElementById('study-chapter-titles');
+const studySheetTitle=document.getElementById('study-sheet-title'),studySave=document.getElementById('study-save');
+let STUDY_EDIT_ID=null;
 const chapterTitles=()=>studyChapterTitles.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
 document.getElementById('study-day-list').innerHTML=WD.map((d,i)=>`<label><input type="checkbox" value="${i}" checked><span>${WDS[i]}</span></label>`).join('');
 function selectedStudyDays(){return [...document.querySelectorAll('#study-day-list input:checked')].map(x=>+x.value)}
 function resetStudyForm(){
-  studyInputs[0].value='';studyInputs[1].value='';studyInputs[1].readOnly=false;delete studyInputs[1].dataset.autoTotal;studyInputs[2].value='1';studyInputs[3].value='';studyChapterTitles.value='';studyMode.value='page';studyPlanKind.value='deadline';
+  studyInputs[0].value='';studyInputs[1].value='';studyInputs[1].readOnly=false;delete studyInputs[1].dataset.autoTotal;studyInputs[2].value='1';studyInputs[2].readOnly=false;studyInputs[3].value='';studyChapterTitles.value='';studyMode.value='page';studyPlanKind.value='deadline';
   document.querySelectorAll('#study-day-list input').forEach(x=>x.checked=true);updateStudyForm();
 }
-function openStudySheet(){resetStudyForm();studyOv.classList.add('show');setTimeout(()=>studyInputs[0].focus(),50)}
-function closeStudySheet(){studyOv.classList.remove('show')}
+function openStudySheet(){STUDY_EDIT_ID=null;resetStudyForm();studySheetTitle.textContent='برنامه مطالعه تازه';studySave.textContent='ساخت برنامه';studyOv.classList.add('show');setTimeout(()=>studyInputs[0].focus(),50)}
+function editStudySheet(id){
+  const p=studyById(id);if(!p)return;
+  STUDY_EDIT_ID=id;resetStudyForm();studySheetTitle.textContent='ویرایش برنامه مطالعه';studySave.textContent='ذخیره تغییرات';
+  studyInputs[0].value=p.title;studyMode.value=p.mode;studyPlanKind.value=p.planKind||'deadline';studyInputs[1].value=p.total;
+  studyInputs[2].value=Math.min(p.total,studyDone(p)+1);studyInputs[2].readOnly=true;studyInputs[3].value=p.pace;
+  studyChapterTitles.value=Array.isArray(p.chapterTitles)?p.chapterTitles.join('\n'):'';
+  document.querySelectorAll('#study-day-list input').forEach(x=>x.checked=(p.days||[0,1,2,3,4,5,6]).includes(+x.value));
+  updateStudyForm();studyOv.classList.add('show');setTimeout(()=>studyInputs[0].focus(),50);
+}
+function closeStudySheet(){studyOv.classList.remove('show');STUDY_EDIT_ID=null}
 document.getElementById('study-scrim').onclick=closeStudySheet;
 function studyDraft(){
   const mode=studyMode.value,titles=mode==='chapter'?chapterTitles():[],total=titles.length||+studyInputs[1].value,start=Math.max(1,+studyInputs[2].value||1),pace=+studyInputs[3].value,days=selectedStudyDays();
@@ -100,7 +111,7 @@ function updateStudyForm(){
   if(titles.length){studyInputs[1].value=titles.length;studyInputs[1].readOnly=true;studyInputs[1].dataset.autoTotal='1'}
   else{if(studyInputs[1].dataset.autoTotal)studyInputs[1].value='';studyInputs[1].readOnly=false;delete studyInputs[1].dataset.autoTotal}
   document.getElementById('study-total-label').textContent=chapter?(titles.length?'تعداد فصل‌ها (خودکار)':'تعداد فصل‌ها'):'تعداد کل صفحات';
-  document.getElementById('study-start-label').textContent=chapter?'شروع از فصل':'شروع از صفحه';
+  document.getElementById('study-start-label').textContent=STUDY_EDIT_ID?(chapter?'فصل بعدی':'صفحه بعدی'):(chapter?'شروع از فصل':'شروع از صفحه');
   document.getElementById('study-pace-label').textContent=chapter?'روزانه چند فصل؟':studyPlanKind.value==='daily'?'روزانه چند صفحه؟':'چند روز فرصت داری؟';
   const x=studyDraft(),box=document.getElementById('study-preview');
   if(!x.total||!x.pace||x.start>x.total||!x.days.length){box.textContent='اطلاعات را کامل کن تا برنامه را ببینی.';return}
@@ -121,9 +132,20 @@ studyPlanKind.onchange=updateStudyForm;
 studyInputs.forEach(x=>x.addEventListener('input',updateStudyForm));
 studyChapterTitles.addEventListener('input',updateStudyForm);
 document.getElementById('study-day-list').addEventListener('change',updateStudyForm);
-document.getElementById('study-save').onclick=()=>{
+studySave.onclick=()=>{
   const x=studyDraft();
   if(!x.title||!x.total||!x.pace||x.start>x.total||!x.days.length){toast('نام کتاب و عددهای برنامه را درست وارد کن.',3500);return}
+  if(STUDY_EDIT_ID){
+    const p=studyById(STUDY_EDIT_ID);if(!p)return;
+    const done=studyDone(p);if(x.total<done){toast(`تعداد کل نمی‌تواند از مقدار خوانده‌شده (${fa(done)}) کمتر باشد.`,4000);return}
+    p.title=x.title;p.mode=x.mode;p.planKind=x.planKind;p.total=Math.round(x.total);p.pace=Math.round(x.pace);p.days=x.days;
+    if(x.mode==='chapter'&&x.chapterTitles.length)p.chapterTitles=x.chapterTitles;else delete p.chapterTitles;
+    if(x.mode==='page'){
+      const remaining=Math.max(0,p.total-done),sessions=x.planKind==='daily'?Math.ceil(remaining/p.pace):p.pace;
+      p.endDate=nextStudyDate(p,TODAY(),Math.max(0,sessions-1));
+    }else delete p.endDate;
+    saveStudy();closeStudySheet();S.tab=5;render();toast('تغییرات برنامه ذخیره شد.',2800);return;
+  }
   const p={id:Date.now(),title:x.title,mode:x.mode,planKind:x.planKind,total:Math.round(x.total),pace:Math.round(x.pace),days:x.days,initialDone:x.start-1,logs:{},startDate:TODAY()};
   if(x.mode==='chapter'&&x.chapterTitles.length)p.chapterTitles=x.chapterTitles;
   if(x.mode==='page'){
