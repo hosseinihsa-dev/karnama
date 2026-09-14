@@ -40,7 +40,7 @@ function studyToday(d){
   });
   if(!due.length)return '';
   return `<div class="ghead"><b>مطالعه امروز</b><i></i><span>${fa(due.length)} کتاب</span></div>`+
-    due.map(p=>studyCard(p,d,true)).join('');
+    `<div class="study-strip">${due.map(p=>studyCard(p,d,true)).join('')}</div>`;
 }
 
 function studyCard(p,d=TODAY(),today=false){
