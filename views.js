@@ -321,7 +321,7 @@ const pk=document.getElementById('pick'),pkbx=pk.querySelector('.bx');
 pk.querySelector('.bd').onclick=()=>pk.classList.remove('show');
 function picker(f){
   const g=S.pv,today=TODAY();
-  if(f==='date'){calAnchor=null;calPicker(f);return}
+  if(f==='date'||f==='until'){calAnchor=null;calPicker(f);return}
   let title,opts;
   if(f==='c'){title='دسته';opts=CATS.map((c,i)=>({v:i,l:c.name,on:i===g.c,color:col(c.h)}))}
   else if(f==='s'){title='زمان روز';opts=SLOTS.map((s,i)=>({v:i,l:s,on:i===g.s}))}
@@ -329,34 +329,32 @@ function picker(f){
   else if(f==='rep'){title='تکرار';opts=REPS.map((r,i)=>({v:i,l:r===REP_H?`هر چند ساعت یک‌بار (مثل دارو)`:(r||'بدون تکرار'),on:(g.rep||null)===r}))}
   else if(f==='every'){title='هر چند ساعت یک‌بار؟';
         opts=EVERY_OPTS.map(n=>({v:n,l:`هر ${fa(n)} ساعت — روزی ${fa(Math.round(24/n))} نوبت`,on:(g.every||8)===n}))}
-  else if(f==='until'){title='تکرار تا کِی؟';
-        opts=[{v:'',l:'بدون پایان — همیشه تکرار شود',on:!g.until},
-              {v:addDays(today,-1),l:'تمام شد — از امروز دیگر تکرار نشود',on:g.until===addDays(today,-1)},
-              {v:addDays(weekStart(today),6),l:'تا آخر این هفته',on:g.until===addDays(weekStart(today),6)},
-              {v:addDays(today,14),l:'تا دو هفته دیگر',on:g.until===addDays(today,14)},
-              {v:endOfJMonth(today),l:'تا آخر این ماه',on:g.until===endOfJMonth(today)},
-              {v:addDays(today,90),l:'تا سه ماه دیگر',on:g.until===addDays(today,90)}];
-        for(let i=1;i<=10;i++){const d=addDays(today,i);
-          opts.push({v:d,l:'تا '+fa(WD[wdIndex(d)]+' '+jdate(d)),on:g.until===d})}}
-  else if(f==='time'){title='ساعت';opts=[{v:'',l:'بدون ساعت',on:!g.time}];
-        for(let hh=6;hh<=23;hh++)for(const mm of ['00','30']){const v=hh+':'+mm;opts.push({v:v,l:fa(v),on:g.time===v})}}
+  else if(f==='time'){
+    pkbx.innerHTML=`<h4>ساعت دقیق</h4><div class="time-exact">
+      <label for="exact-time">ساعت و دقیقه را انتخاب کن</label>
+      <input id="exact-time" type="time" step="60" value="${g.time||''}">
+      <div><button class="b-nu" data-no-time="1">بدون ساعت</button><button class="b-gold" data-save-time="1">تأیید ساعت</button></div>
+    </div>`;
+    const input=pkbx.querySelector('#exact-time');
+    pkbx.querySelector('[data-no-time]').onclick=()=>{g.time=null;g.touched=true;pk.classList.remove('show');updatePv()};
+    pkbx.querySelector('[data-save-time]').onclick=()=>{
+      if(!input.value){toast('ساعت و دقیقه را انتخاب کن.',2500);return}
+      g.time=input.value;const hh=+g.time.split(':')[0];g.s=hh<12?0:(hh<18?1:2);
+      g.touched=true;pk.classList.remove('show');updatePv();
+    };
+    pk.classList.add('show');setTimeout(()=>input.focus(),40);return;
+  }
   else{title='روز';opts=[];for(let i=0;i<15;i++){const d=addDays(today,i);
         opts.push({v:d,l:i===0?'امروز':i===1?'فردا':fa(`${WD[wdIndex(d)]} ${jdate(d)}`),on:d===g.date})}}
-  const calBtn=(f==='until'||f==='date')
-    ?`<button class="op cal-open" data-cal-open="1" style="color:#C9A227;background:rgba(201,162,39,.13);font-weight:700">انتخاب تاریخ دقیق از تقویم…</button>`:'';
-  pkbx.innerHTML=`<h4>${title}</h4>`+calBtn+opts.map((o,i)=>
+  pkbx.innerHTML=`<h4>${title}</h4>`+opts.map((o,i)=>
     `<button class="op ${o.on?'on':''}" data-i="${i}">${o.color?`<span class="d5" style="width:7px;height:7px;border-radius:99px;background:${o.color}"></span>`:''}${o.l}</button>`).join('');
-  const co=pkbx.querySelector('[data-cal-open]');
-  if(co)co.onclick=()=>{calAnchor=null;calPicker(f)};
-  pkbx.querySelectorAll('.op:not(.cal-open)').forEach((b,i)=>b.onclick=()=>{
+  pkbx.querySelectorAll('.op').forEach((b,i)=>b.onclick=()=>{
     const val=opts[i].v;
     if(f==='rep'){
       g.rep=REPS[val];
       if(g.rep===REP_H){if(!g.every)g.every=8;g.touched=true;updatePv();return picker('every')}
     }
     else if(f==='every')g.every=val;
-    else if(f==='until')g.until=val||null;
-    else if(f==='time'){g.time=val||null;if(val){const hh=+val.split(':')[0];g.s=hh<12?0:(hh<18?1:2)}}
     else g[f]=val;
     g.touched=true;pk.classList.remove('show');updatePv();
   });
@@ -380,7 +378,7 @@ function calPicker(f){
       <button data-quick="${addDays(today,1)}" class="${cur===addDays(today,1)?'on':''}">فردا</button>
       <button data-quick="${endWeek}" class="${cur===endWeek?'on':''}">آخر این هفته</button>
       <button data-quick="${nextWeek}" class="${cur===nextWeek?'on':''}">شنبه آینده</button>
-    </div>`:'';
+    </div>`:`<div class="date-quick one"><button data-no-end="1" class="${!g.until?'on':''}">بدون پایان؛ همیشه تکرار شود</button></div>`;
   let h=`<h4>${f==='until'?'تکرار تا کدام روز؟':'کار برای کدام روز؟'}</h4>${quick}
     <div class="mhead" style="margin:2px 0 6px">
       <button class="mnav" data-cal="${prev}">›</button>
@@ -391,19 +389,19 @@ function calPicker(f){
   days.forEach(x=>{
     h+=`<button class="mcell ${x===cur?'on':''} ${x===today?'today':''}" data-pick="${x}"><span>${fa(jparts(x).d)}</span></button>`;
   });
-  h+=`</div>${f==='until'?'<button class="op" data-back="1" style="margin-top:6px">بازگشت به گزینه‌های سریع</button>':''}`;
+  h+='</div>';
   pkbx.innerHTML=h;
   pkbx.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>{
     g.date=b.dataset.quick;g.touched=true;calAnchor=null;pk.classList.remove('show');updatePv();
   });
+  const noEnd=pkbx.querySelector('[data-no-end]');
+  if(noEnd)noEnd.onclick=()=>{g.until=null;g.touched=true;calAnchor=null;pk.classList.remove('show');updatePv()};
   pkbx.querySelectorAll('[data-cal]').forEach(b=>b.onclick=()=>{calAnchor=b.dataset.cal;calPicker(f)});
   pkbx.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
     const v=b.dataset.pick;
     if(f==='until')g.until=v;else g.date=v;
     g.touched=true;calAnchor=null;pk.classList.remove('show');updatePv();
   });
-  const back=pkbx.querySelector('[data-back]');
-  if(back)back.onclick=()=>{calAnchor=null;picker(f)};
   pk.classList.add('show');
 }
 
