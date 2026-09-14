@@ -114,6 +114,8 @@ function updateStudyForm(){
   document.getElementById('study-start-label').textContent=STUDY_EDIT_ID?(chapter?'فصل بعدی':'صفحه بعدی'):(chapter?'شروع از فصل':'شروع از صفحه');
   document.getElementById('study-pace-label').textContent=chapter?'روزانه چند فصل؟':studyPlanKind.value==='daily'?'روزانه چند صفحه؟':'چند روز فرصت داری؟';
   const x=studyDraft(),box=document.getElementById('study-preview');
+  if(STUDY_EDIT_ID){const p=studyById(STUDY_EDIT_ID),done=p?studyDone(p):0;if(x.total&&x.total<done){box.innerHTML=`تا الان <b>${studyUnit(p,done)}</b> ثبت شده؛ تعداد کل باید حداقل ${fa(done)} باشد.`;box.classList.add('warn');return}}
+  box.classList.remove('warn');
   if(!x.total||!x.pace||x.start>x.total||!x.days.length){box.textContent='اطلاعات را کامل کن تا برنامه را ببینی.';return}
   const p={mode:x.mode,total:x.total,pace:x.pace,days:x.days,initialDone:x.start-1,logs:{},startDate:TODAY()};
   if(x.mode==='page'){
@@ -134,7 +136,7 @@ studyChapterTitles.addEventListener('input',updateStudyForm);
 document.getElementById('study-day-list').addEventListener('change',updateStudyForm);
 studySave.onclick=()=>{
   const x=studyDraft();
-  if(!x.title||!x.total||!x.pace||x.start>x.total||!x.days.length){toast('نام کتاب و عددهای برنامه را درست وارد کن.',3500);return}
+  if(!x.title||!x.total||!x.pace||(!STUDY_EDIT_ID&&x.start>x.total)||!x.days.length){toast('نام کتاب و عددهای برنامه را درست وارد کن.',3500);return}
   if(STUDY_EDIT_ID){
     const p=studyById(STUDY_EDIT_ID);if(!p)return;
     const done=studyDone(p);if(x.total<done){toast(`تعداد کل نمی‌تواند از مقدار خوانده‌شده (${fa(done)}) کمتر باشد.`,4000);return}
