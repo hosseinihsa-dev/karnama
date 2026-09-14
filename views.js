@@ -16,7 +16,7 @@ function render(){
   document.getElementById('sub').textContent=fa(`${WD[wdIndex(today)]} ${jdate(today)} · ${list.length} کار برای امروز · ${doneN} انجام شده`);
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',+b.dataset.tab===S.tab));
   const v=document.getElementById('view');
-  v.innerHTML=[todayView,tomorrowView,weekView,monthView,catView,studyView][S.tab](overdue,list,doneN,today);
+  v.innerHTML=[todayView,tomorrowView,weekView,monthView,catView,studyView,plannerPage][S.tab](overdue,list,doneN,today);
   v.querySelectorAll('[data-act]').forEach(el=>{
     el.onclick=()=>{
       const id=+el.dataset.id,a=el.dataset.act;
@@ -40,7 +40,7 @@ function render(){
       else if(a==='studyExtend'){const p=studyById(id);if(p){p.endDate=nextStudyDate(p,addDays(TODAY(),1),6);saveStudy();render();toast('مهلت مطالعه هفت جلسه تمدید شد.')}}
       else if(a==='studyDelete')removeStudyWithUndo(id);
       else if(a==='planPreview'){S.planPreview=true;render()}
-      else if(a==='planClose'){S.planPreview=false;render()}
+      else if(a==='planClose'){S.planPreview=false;S.tab=0;render()}
       else if(a==='planApprove'){approvePlan(list);S.planPreview=false;render();toast('برنامه امروز تأیید شد.',2800)}
     };
   });
@@ -70,7 +70,6 @@ function todayView(overdue,list,doneN,today){
   h+=`<div class="prog"><div class="prog-top"><span class="prog-msg">${msg}</span><span class="prog-pct">${fa(pct)}٪</span></div>
       <div class="track"><div class="fill" style="width:${pct}%"></div></div></div>`;
   h+=studyToday(today);
-  h+=plannerView(list,today);
   const notes=['','صبح، بعدازظهر و شب — و در هر بازه، مهم‌ترین کار بالاتر','کارهای هم‌دسته پشت سر هم، تا یک‌جا تمامشان کنی'];
   h+=`<div><div class="seg">${['به ترتیب اولویت','به ترتیب زمان','بر اساس دسته'].map((s,i)=>
       `<button class="${S.sort===i?'on':''}" data-act="sort" data-v="${i}" data-id="0">${s}</button>`).join('')}</div>
@@ -96,12 +95,20 @@ function todayView(overdue,list,doneN,today){
   return h;
 }
 
+function plannerPage(overdue,list,doneN,today){
+  let h=`<div class="mhead">
+      <button class="mnav" data-act="planClose" data-id="0">›</button>
+      <b>برنامه‌ی پیشنهادی امروز</b>
+      <span style="width:34px;flex:none"></span></div>`;
+  const body=plannerView(list,today);
+  return h+(body||'<div class="empty">امروز کار فعالی نداری که برایش برنامه بچینم.</div>');
+}
+
 function plannerView(list,d){
   const plan=dailyPlan(list),now=new Date(),nowMin=now.getHours()*60+now.getMinutes(),approved=approvedPlan(list);
   if(!plan.length)return '';
-  if(!approved&&!S.planPreview)return `<button class="planner-trigger" data-act="planPreview" data-id="0"><span><b>برنامه پیشنهادی امروز</b><small>${fa(plan.length)} کار را برایت زمان‌بندی کردم</small></span><i>دیدن برنامه</i></button>`;
   const overflow=plan.filter(x=>x.overflow).length,collision=plan.filter(x=>x.collision).length;
-  let h=`<section class="planner ${approved?'approved':''}"><div class="planner-head"><div><b>${approved?'برنامه امروز':'پیش‌نمایش برنامه امروز'}</b><span>کارهای ساعت‌دار ثابت‌اند؛ بقیه در زمان‌های خالی چیده شده‌اند.</span></div><em>${fa(plan.length)} بخش</em></div>`;
+  let h=`<section class="planner ${approved?'approved':''}"><div class="planner-head"><div><b>${approved?'برنامه تأییدشده':'پیش‌نمایش'}</b><span>کارهای ساعت‌دار ثابت‌اند؛ بقیه در زمان‌های خالی چیده شده‌اند.</span></div><em>${fa(plan.length)} بخش</em></div>`;
   if(overflow||collision)h+=`<div class="planner-warn">${collision?fa(collision)+' تداخل زمانی':''}${collision&&overflow?' · ':''}${overflow?fa(overflow)+' کار بیرون از بازه معمول':''} — برای سبک‌تر شدن روز، زمان یا روز یکی از کارها را تغییر بده.</div>`;
   h+='<div class="timeline">';
   plan.forEach(x=>{
@@ -444,6 +451,7 @@ menuBtn.onclick=openMenu;
 document.getElementById('menu-close').onclick=closeMenu;
 sideMenu.querySelector('.side-scrim').onclick=closeMenu;
 document.getElementById('menu-categories').onclick=()=>{S.tab=4;S.cat=null;closeMenu();render()};
+document.getElementById('menu-planner').onclick=()=>{S.tab=6;S.planPreview=true;closeMenu();render()};
 document.getElementById('side-backup').onclick=()=>{closeMenu();doBackup()};
 document.getElementById('side-restore').onclick=()=>{closeMenu();if(impEl)impEl.click()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sideMenu.classList.contains('show'))closeMenu()});
