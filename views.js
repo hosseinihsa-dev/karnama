@@ -2,8 +2,8 @@
 
 function taskCard(t,i){
   return `<div class="task">
-      <button class="box ${t.done?'on':''}" data-act="toggle" data-id="${t.id}" data-date="${t.date}">${t.done?'✓':''}</button>
-      <div class="tmid"><div data-act="edit" data-id="${t.id}"><div class="ttl ${t.done?'done':''}">${esc(t.title)}</div>${t.note&&t.note!==t.title?`<div class="note">${esc(t.note)}</div>`:''}</div><div class="chips">${taskChips(t)}</div></div>
+      <button class="box ${t.done?'on':''}" data-act="toggle" data-id="${t.id}" data-date="${t.key||t.date}">${t.done?'✓':''}</button>
+      <div class="tmid"><div data-act="edit" data-id="${t.id}"><div class="ttl ${t.done?'done':''}">${esc(t.title)}${t.doseAll>1?` <span style="color:#8A8D95;font-weight:500">(نوبت ${fa(t.doseN)} از ${fa(t.doseAll)})</span>`:''}</div>${t.note&&t.note!==t.title?`<div class="note">${esc(t.note)}</div>`:''}</div><div class="chips">${taskChips(t)}</div></div>
       <span class="rank">${fa(String(i+1).padStart(2,'0'))}</span></div>`;
 }
 
@@ -109,7 +109,7 @@ function plannerView(list,d){
     h+=`<div class="plan-row ${live?'live':''} ${x.overflow||x.collision?'risk':''}">
       <div class="plan-time"><b>${clock(x.start)}</b><span>${fa(x.duration)} دقیقه</span></div>
       <i class="plan-line"><u></u></i>
-      <div class="plan-item"><button class="box" data-act="toggle" data-id="${x.t.id}" data-date="${d}" aria-label="انجام شد"></button>
+      <div class="plan-item"><button class="box" data-act="toggle" data-id="${x.t.id}" data-date="${x.t.key||d}" aria-label="انجام شد"></button>
         <div data-act="edit" data-id="${x.t.id}"><b>${esc(x.t.title)}</b><span>${CATS[x.t.c].name} · ${x.fixed?'ساعت ثابت':'زمان پیشنهادی'}${live?' · اکنون':''}</span></div></div></div>`;
   });
   h+='</div>';
@@ -123,7 +123,7 @@ function tomorrowView(){
   const sorted=[...list].sort(bySlot);
   let h=`<div class="dayhead">فردا — ${fa(WD[wdIndex(d)]+' '+jdate(d))} · ${fa(list.length)} کار</div>`;
   const books=STUDY.filter(p=>studyRemaining(p)>0&&!p.paused&&studyActive(p,d));
-  if(books.length)h+=`<div class="ghead"><b>مطالعه</b><i></i><span>${fa(books.length)} کتاب</span></div>${books.map(p=>studyCard(p,d)).join('')}`;
+  if(books.length)h+=`<div class="ghead"><b>مطالعه</b><i></i><span>${fa(books.length)} کتاب</span></div><div class="study-strip">${books.map(p=>studyCard(p,d)).join('')}</div>`;
   let lh='';
   sorted.forEach((t,i)=>{
     if(i===0||sorted[i-1].s!==t.s||sorted[i-1].done!==t.done)
@@ -139,12 +139,12 @@ function dayList(d){
   const dt=instOn(d).sort(bySlot);
   const books=STUDY.filter(p=>studyRemaining(p)>0&&!p.paused&&studyActive(p,d));
   let h=`<div class="dayhead">${fa(WD[wdIndex(d)]+' '+jdate(d))} — ${fa(dt.length)} کار${books.length?' · '+fa(books.length)+' مطالعه':''}</div>`;
-  if(books.length)h+=books.map(p=>studyCard(p,d)).join('');
+  if(books.length)h+=`<div class="study-strip">${books.map(p=>studyCard(p,d)).join('')}</div>`;
   if(!dt.length&&!books.length)return h+'<div class="empty">این روز خالیه. یک روز آزاد هم لازمه.</div>';
   if(!dt.length)return h;
   return h+'<div class="list">'+dt.map(t=>`<div class="drow"><span class="acc" style="background:${col(CATS[t.c].h)}"></span>
     <div style="flex:1;min-width:0" data-act="edit" data-id="${t.id}"><div class="t">${esc(t.title)}</div>
-    <div class="m">${CATS[t.c].name} · ${t.time?fa(t.time):SLOTS[t.s]} · ${PRI[t.p]}${t.rep?' · '+t.rep:''}</div></div></div>`).join('')+'</div>';
+    <div class="m">${CATS[t.c].name} · ${t.time?fa(t.time):SLOTS[t.s]} · ${PRI[t.p]}${t.rep?' · '+repLabel(t):''}</div></div></div>`).join('')+'</div>';
 }
 
 function weekView(){
@@ -214,7 +214,7 @@ function catView(){
     else h+='<div class="list">'+items.map(t=>`<div class="drow"><span class="acc" style="background:${col(c.h)}"></span>
       <div style="flex:1;min-width:0" data-act="edit" data-id="${t.id}">
         <div class="t" ${t.done&&!t.rep?'style="text-decoration:line-through;color:#6E7179"':''}>${esc(t.title)}</div>
-        <div class="m">${t.rep?t.rep+(t.until?' تا '+fa(jdate(t.until)):'')+' · از '+dlabel(t.date):dlabel(t.date)} · ${t.time?fa(t.time):SLOTS[t.s]} · ${PRI[t.p]}</div>
+        <div class="m">${t.rep?repLabel(t)+(t.until?' تا '+fa(jdate(t.until)):'')+' · از '+dlabel(t.date):dlabel(t.date)} · ${t.time?fa(t.time):SLOTS[t.s]} · ${PRI[t.p]}</div>
       </div></div>`).join('')+'</div>';
     return h;
   }
@@ -269,7 +269,7 @@ function openSheet(id){
   document.getElementById('sh-del').style.display=t?'block':'none';
   if(t){dr.value=t.note||t.title;
     const auto=titleFrom(t.note||t.title);
-    S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,until:t.until||null,date:t.date,time:t.time||null,
+    S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,every:t.every||null,until:t.until||null,date:t.date,time:t.time||null,
           title:t.title,titleManual:t.title!==auto,touched:true};}
   else {dr.value='';S.pv=null}
   updatePv();ov.classList.add('show');setTimeout(()=>dr.focus(),60);
@@ -296,7 +296,7 @@ function updatePv(){
     `<button class="chip c-nu" data-f="s">${SLOTS[g.s]}</button>`+
     `<button class="chip c-nu" data-f="time">${g.time?fa(g.time):'بدون ساعت'}</button>`+
     `<button class="chip c-nu" data-f="p">${PRI[g.p]}</button>`+
-    `<button class="chip c-inf" data-f="rep">${g.rep||'بدون تکرار'}</button>`+
+    `<button class="chip c-inf" data-f="rep">${g.rep?repLabel(g):'بدون تکرار'}</button>`+
     (g.rep?`<button class="chip c-inf" data-f="until">${g.until?'تا '+fa(jdate(g.until)):'بدون پایان'}</button>`:'');
   pc.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>picker(b.dataset.f));
   const tl=document.getElementById('pv-title');
@@ -318,7 +318,9 @@ function picker(f){
   if(f==='c'){title='دسته';opts=CATS.map((c,i)=>({v:i,l:c.name,on:i===g.c,color:col(c.h)}))}
   else if(f==='s'){title='زمان روز';opts=SLOTS.map((s,i)=>({v:i,l:s,on:i===g.s}))}
   else if(f==='p'){title='اولویت';opts=PRI.map((s,i)=>({v:i,l:s,on:i===g.p}))}
-  else if(f==='rep'){title='تکرار';opts=REPS.map((r,i)=>({v:i,l:r||'بدون تکرار',on:(g.rep||null)===r}))}
+  else if(f==='rep'){title='تکرار';opts=REPS.map((r,i)=>({v:i,l:r===REP_H?`هر چند ساعت یک‌بار (مثل دارو)`:(r||'بدون تکرار'),on:(g.rep||null)===r}))}
+  else if(f==='every'){title='هر چند ساعت یک‌بار؟';
+        opts=EVERY_OPTS.map(n=>({v:n,l:`هر ${fa(n)} ساعت — روزی ${fa(Math.round(24/n))} نوبت`,on:(g.every||8)===n}))}
   else if(f==='until'){title='تکرار تا کِی؟';
         opts=[{v:'',l:'بدون پایان — همیشه تکرار شود',on:!g.until},
               {v:addDays(today,-1),l:'تمام شد — از امروز دیگر تکرار نشود',on:g.until===addDays(today,-1)},
@@ -340,7 +342,11 @@ function picker(f){
   if(co)co.onclick=()=>{calAnchor=null;calPicker(f)};
   pkbx.querySelectorAll('.op:not(.cal-open)').forEach((b,i)=>b.onclick=()=>{
     const val=opts[i].v;
-    if(f==='rep')g.rep=REPS[val];
+    if(f==='rep'){
+      g.rep=REPS[val];
+      if(g.rep===REP_H){if(!g.every)g.every=8;g.touched=true;updatePv();return picker('every')}
+    }
+    else if(f==='every')g.every=val;
     else if(f==='until')g.until=val||null;
     else if(f==='time'){g.time=val||null;if(val){const hh=+val.split(':')[0];g.s=hh<12?0:(hh<18?1:2)}}
     else g[f]=val;
@@ -410,18 +416,18 @@ sb.onclick=()=>{
   {const auto=classify(txt);if(g.c!==auto.c)learnCat(txt,g.c);}
   if(S.edit){
     const t=byId(S.edit);
-    const changes={title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null};
+    const changes={title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null};
     if(duplicateOf(changes,S.edit)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
     if(t)Object.assign(t,changes);
     save();closeSheet();S.day=g.date;S.pv=null;S.edit=null;dr.value='';render();
     toast('تغییرات ذخیره شد.',2600);
     return;
   }
-  const newTask={id:Date.now(),title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0};
+  const newTask={id:Date.now(),title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0};
   if(duplicateOf(newTask)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
   S.tasks.push(newTask);
   save();closeSheet();S.tab=g.date===addDays(today,1)?1:0;S.day=g.date;S.pv=null;dr.value='';render();
-  toast(`اضافه شد به «${CATS[g.c].name}»${g.rep?' · '+g.rep+(g.until?' تا '+fa(jdate(g.until)):''):''} · پیشنهاد: ${dl} ${g.time?fa(g.time):SLOTS[g.s]}`);
+  toast(`اضافه شد به «${CATS[g.c].name}»${g.rep?' · '+repLabel(g)+(g.until?' تا '+fa(jdate(g.until)):''):''} · پیشنهاد: ${dl} ${g.time?fa(g.time):SLOTS[g.s]}`);
 };
 
 document.getElementById('sh-del').onclick=()=>{
