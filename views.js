@@ -323,7 +323,17 @@ function picker(f){
   const g=S.pv,today=TODAY();
   if(f==='date'||f==='until'){calAnchor=null;calPicker(f);return}
   let title,opts;
-  if(f==='c'){title='دسته';opts=CATS.map((c,i)=>({v:i,l:c.name,on:i===g.c,color:col(c.h)}))}
+  if(f==='c'){
+    pkbx.innerHTML=`<h4>دسته را انتخاب کن</h4><div class="cat-picker">${CATS.map((c,i)=>
+      `<button class="cat-choice ${i===g.c?'on':''}" data-i="${i}" style="--cat-color:${col(c.h)};--cat-bg:${col(c.h,.13)}" aria-label="${c.name}">
+        <span class="cat-choice-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${c.ic}"/></svg></span>
+        <span>${c.name}</span>
+      </button>`).join('')}</div>`;
+    pkbx.querySelectorAll('.cat-choice').forEach(b=>b.onclick=()=>{
+      g.c=+b.dataset.i;g.touched=true;pk.classList.remove('show');updatePv();
+    });
+    pk.classList.add('show');return;
+  }
   else if(f==='s'){title='زمان روز';opts=SLOTS.map((s,i)=>({v:i,l:s,on:i===g.s}))}
   else if(f==='p'){title='اولویت';opts=PRI.map((s,i)=>({v:i,l:s,on:i===g.p}))}
   else if(f==='rep'){title='تکرار';opts=REPS.map((r,i)=>({v:i,l:r===REP_H?`هر چند ساعت یک‌بار (مثل دارو)`:(r||'بدون تکرار'),on:(g.rep||null)===r}))}
