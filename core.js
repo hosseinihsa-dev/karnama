@@ -17,7 +17,10 @@ const SLOTS=['صبح','بعدازظهر','شب'];
 const PRI=['مهم و فوری','اولویت متوسط','وقت آزاد'];
 const WD=['شنبه','یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه'];
 const WDS=['شنبه','یک','دو','سه','چهار','پنج','جمعه'];
-const REPS=[null,'هر روز','هر هفته','هر ماه'];
+const REP_H='هر چند ساعت';
+const REPS=[null,'هر روز','هر هفته','هر ماه',REP_H];
+const EVERY_OPTS=[1,2,3,4,6,8,12];
+const repLabel=t=>t.rep===REP_H?`هر ${fa(t.every||8)} ساعت`:t.rep;
 const WDV=[[5,['پنجشنبه','پنج‌شنبه','پنج شنبه']],[4,['چهارشنبه','چهار‌شنبه','چهار شنبه']],
            [3,['سه‌شنبه','سه شنبه','سهشنبه']],[2,['دوشنبه','دو شنبه']],[1,['یکشنبه','یک شنبه','۱شنبه']],
            [6,['جمعه']],[0,['شنبه']]];
@@ -52,13 +55,35 @@ function occursOn(t,d){
   if(!t.rep)return t.date===d;
   if(d<t.date)return false;
   if(t.until&&d>t.until)return false;
-  if(t.rep==='هر روز')return true;
+  if(t.rep==='هر روز'||t.rep===REP_H)return true;
   if(t.rep==='هر هفته')return diffDays(d,t.date)%7===0;
   if(t.rep==='هر ماه')return jparts(d).d===jparts(t.date).d;
   return false;
 }
-const isDone=(t,d)=>t.rep?!!(t.doneOn&&t.doneOn[d]):!!t.done;
-const instOn=d=>S.tasks.filter(t=>occursOn(t,d)).map(t=>Object.assign({},t,{date:d,done:isDone(t,d)}));
+const isDone=(t,k)=>t.rep?!!(t.doneOn&&t.doneOn[k]):!!t.done;
+/* an every-N-hours task shows several times a day, each dose on its own line */
+function doseTimes(t){
+  const every=Math.max(1,Math.min(24,+t.every||8))*60;
+  const start=t.time?(+t.time.split(':')[0]*60+ +t.time.split(':')[1]):8*60;
+  const out=[];
+  for(let m=start%every;m<1440;m+=every)out.push(String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));
+  return out;
+}
+const slotOfTime=v=>{const hh=+v.split(':')[0];return hh<12?0:(hh<18?1:2)};
+function instOn(d){
+  const out=[];
+  S.tasks.forEach(t=>{
+    if(!occursOn(t,d))return;
+    if(t.rep===REP_H){
+      const times=doseTimes(t);
+      times.forEach((v,i)=>{
+        const k=d+'@'+v;
+        out.push(Object.assign({},t,{date:d,time:v,s:slotOfTime(v),key:k,done:isDone(t,k),doseN:i+1,doseAll:times.length}));
+      });
+    }else out.push(Object.assign({},t,{date:d,key:d,done:isDone(t,d)}));
+  });
+  return out;
+}
 
 /* ---- ordering: morning → afternoon → night, then clock time, then priority ---- */
 const tmin=t=>t.time?(+t.time.split(':')[0]*60+ +t.time.split(':')[1]):null;
@@ -77,7 +102,7 @@ const SLOT_WINDOWS=[[8*60,13*60],[13*60,18*60],[18*60,22*60]];
 const CAT_DURATION=[60,45,120,45,60,45,45,30,60,60,30,25];
 const pn=s=>+String(s).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace('٫','.');
 function taskDuration(t){
-  const x=(t.note||t.title||'').replace(/یک\s*ساعت/g,'1 ساعت').replace(/دو\s*ساعت/g,'2 ساعت').replace(/سه\s*ساعت/g,'3 ساعت');
+  const x=(t.note||t.title||'').replace(/هر\s*[\d۰-۹]+\s*ساعت/g,' ').replace(/یک\s*ساعت/g,'1 ساعت').replace(/دو\s*ساعت/g,'2 ساعت').replace(/سه\s*ساعت/g,'3 ساعت');
   if(/نیم\s*ساعت/.test(x))return 30;
   if(/ربع\s*ساعت/.test(x))return 15;
   let m=x.match(/([\d۰-۹]+)\s*(?:دقیقه|دقه)/);if(m)return Math.max(5,Math.min(480,pn(m[1])));
@@ -183,10 +208,13 @@ function classify(text){
   const lv=lwords(t).map(w=>LEARN[w]).filter(v=>v!==undefined&&v!==null);
   if(lv.length){const cnt={};lv.forEach(v=>cnt[v]=(cnt[v]||0)+1);
     c=+Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0];}
-  let rep=null;
-  if(/هر\s?روز|روزانه/.test(t))rep='هر روز';
-  else if(/هر\s?هفته|هفتگی/.test(t))rep='هر هفته';
-  else if(/هر\s?ماه|ماهانه/.test(t))rep='هر ماه';
+  let rep=null,every=null;
+  const hm=t.match(/هر\s*([\d۰-۹]{1,2})\s*ساعت/);
+  if(hm){const n=parseInt(String(hm[1]).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)),10);
+    if(n>=1&&n<=24){rep=REP_H;every=n}}
+  if(!rep&&/هر\s?روز|روزانه/.test(t))rep='هر روز';
+  else if(!rep&&/هر\s?هفته|هفتگی/.test(t))rep='هر هفته';
+  else if(!rep&&/هر\s?ماه|ماهانه/.test(t))rep='هر ماه';
   let s=(c===6||c===10)?0:((c===1||c===2)?2:1);
   if(/صبح/.test(t))s=0;else if(/عصر|بعدازظهر|ظهر/.test(t))s=1;else if(/شب|امشب/.test(t))s=2;
   let time=null;
@@ -231,7 +259,7 @@ function classify(text){
         if(n>0)until=addDays(today,um[2]==='روز'?n:um[2]==='هفته'?n*7:n*30);}
     }
   }
-  return {c,s,p,rep,date,time,until};
+  return {c,s,p,rep,every,date,time,until};
 }
 
 /* ---- turn a free description into a short title ---- */
@@ -266,7 +294,7 @@ function titleFrom(text){
 const catChip=t=>`<span class="chip" style="color:${col(CATS[t.c].h)};background:${col(CATS[t.c].h,.13)}"><span class="d5" style="background:${col(CATS[t.c].h)}"></span>${CATS[t.c].name}</span>`;
 function taskChips(t){
   let h=catChip(t)+`<span class="chip c-nu">${t.time?fa(t.time):SLOTS[t.s]}</span>`;
-  if(t.rep)h+=`<span class="chip c-inf">${t.rep}${t.until?' تا '+fa(jdate(t.until)):''}</span>`;
+  if(t.rep)h+=`<span class="chip c-inf">${repLabel(t)}${t.until?' تا '+fa(jdate(t.until)):''}</span>`;
   if(t.rem)h+=`<span class="chip c-rem">یادآور</span>`;
   return h;
 }
@@ -278,9 +306,9 @@ function toast(msg,ms=3800,actionLabel=null,action=null){
 }
 const byId=id=>S.tasks.find(t=>t.id===id);
 function patch(id,ch){const t=byId(id);if(t)Object.assign(t,ch);save();render()}
-function toggle(id,d){
+function toggle(id,k){
   const t=byId(id);if(!t)return;
-  if(t.rep){t.doneOn=t.doneOn||{};if(t.doneOn[d])delete t.doneOn[d];else t.doneOn[d]=1}
+  if(t.rep){t.doneOn=t.doneOn||{};if(t.doneOn[k])delete t.doneOn[k];else t.doneOn[k]=1}
   else t.done=!t.done;
   save();render();
 }
