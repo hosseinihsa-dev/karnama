@@ -264,7 +264,12 @@ function classify(text){
         if(n>0)until=addDays(today,um[2]==='روز'?n:um[2]==='هفته'?n*7:n*30);}
     }
   }
-  return {c,s,p,rep,every,date,time,until};
+  const explicitDuration=/(نیم|ربع|یک|دو|سه|چهار|پنج|شش|[\d۰-۹]+)\s*(ساعت|دقیقه|دقه)/.test(t);
+  const meta={};
+  if(explicitDuration)meta.durationMin=taskDuration({title:t,note:t,c});
+  if(/خیلی\s*مهم|مهمه|ضروری/.test(t)){meta.importance='high';meta.importanceReason='در توضیح کار مهم معرفی شده'}
+  if(/فوری|همین\s*الان|سریع|ددلاین/.test(t)){meta.urgency='high';meta.urgencyReason='در توضیح کار فوریت دارد'}
+  return {c,s,p,rep,every,date,time,until,meta};
 }
 
 /* ---- turn a free description into a short title ---- */

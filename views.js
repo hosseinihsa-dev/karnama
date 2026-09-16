@@ -39,6 +39,11 @@ function render(){
       else if(a==='studyProgress')amountPicker(id);
       else if(a==='studyExtend'){const p=studyById(id);if(p){p.endDate=nextStudyDate(p,addDays(TODAY(),1),6);saveStudy();render();toast('مهلت مطالعه هفت جلسه تمدید شد.')}}
       else if(a==='studyDelete')removeStudyWithUndo(id);
+      else if(a==='decisionStart'){
+        const x=decisionCandidates(S.tasks,TODAY()).find(t=>t.id===id&&decisionKey(t)===(el.dataset.key||decisionKey(t)))||byId(id);
+        if(x){recordDecisionEvent('start',x);toast(`«${x.title}» را شروع کردی؛ وقتی تمام شد تیک انجام را بزن.`,3500)}
+      }
+      else if(a==='decisionReject')decisionRejectPicker(id,el.dataset.key);
       else if(a==='planPreview'){S.planPreview=true;render()}
       else if(a==='planClose'){S.planPreview=false;S.tab=0;render()}
       else if(a==='planApprove'){approvePlan(list);S.planPreview=false;render();toast('برنامه امروز تأیید شد.',2800)}
@@ -47,7 +52,7 @@ function render(){
 }
 
 function todayView(overdue,list,doneN,today){
-  let h='';
+  let h=decisionPanel(today);
   if(overdue.length){
     h+=`<div class="overdue"><div class="ov-head"><div><div class="ov-title">${fa(overdue.length)} کار از روزهای قبل مانده</div>
       <div class="ov-note">اشکالی ندارد — تصمیم بگیر: امروز، فردا، یا بی‌خیالش.</div></div>
@@ -69,7 +74,6 @@ function todayView(overdue,list,doneN,today){
   const msg=pct===100&&list.length?'همه رو زدی. عالی بود.':pct>=50?'نصف راه رو رفتی، ادامه بده':'با یک کار کوچک شروع کن';
   h+=`<div class="prog"><div class="prog-top"><span class="prog-msg">${msg}</span><span class="prog-pct">${fa(pct)}٪</span></div>
       <div class="track"><div class="fill" style="width:${pct}%"></div></div></div>`;
-  h+=studyToday(today);
   const notes=['','صبح، بعدازظهر و شب — و در هر بازه، مهم‌ترین کار بالاتر','کارهای هم‌دسته پشت سر هم، تا یک‌جا تمامشان کنی'];
   h+=`<div><div class="seg">${['به ترتیب اولویت','به ترتیب زمان','بر اساس دسته'].map((s,i)=>
       `<button class="${S.sort===i?'on':''}" data-act="sort" data-v="${i}" data-id="0">${s}</button>`).join('')}</div>
@@ -88,11 +92,29 @@ function todayView(overdue,list,doneN,today){
     lh+=taskCard(t,i);
   });
   h+=`<div class="list">${lh||'<div class="empty">امروز کاری ثبت نشده. با دکمه‌ی + شروع کن.</div>'}</div>`;
-  const next=sorted.find(t=>!t.done);
-  h+=`<div class="sugg"><b>پیشنهاد کارنما: </b>${next
-    ?`الان بهترین وقت برای «${esc(next.title)}» است — ${next.time?fa(next.time):SLOTS[next.s]} و ${PRI[next.p]}.`
-    :'کار باقی‌مانده‌ای نداری؛ یک کار از هفته را جلو بیانداز.'}</div>`;
+  h+=studyToday(today);
   return h;
+}
+
+function decisionPanel(today){
+  const x=chooseNextTask(S.tasks,today);
+  if(!x)return `<section class="decision-card empty-decision"><div class="decision-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V18h8v-2.3A7 7 0 0 0 12 3m-3 18h6"/></svg><span>الان چیکار کنم؟</span></div><p>فعلاً کار مناسبی برای پیشنهاد ندارم. لازم نیست چیزی را تصادفی شروع کنی.</p></section>`;
+  const t=x.task,key=decisionKey(t),when=t.time?` · ${fa(t.time)}`:'';
+  return `<section class="decision-card"><div class="decision-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V18h8v-2.3A7 7 0 0 0 12 3m-3 18h6"/></svg><span>الان چیکار کنم؟</span></div>
+    <div class="decision-label">پیشنهاد کارنما</div><h2>${esc(t.title)}</h2>
+    <div class="decision-meta"><span>${CATS[t.c].name}${when}</span><span>حدود ${fa(x.duration)} دقیقه</span></div>
+    <p class="decision-reason">${esc(x.reason)}</p>
+    <div class="decision-actions"><button class="decision-later" data-act="decisionReject" data-id="${t.id}" data-key="${esc(key)}">الان نمی‌تونم</button><button class="decision-start" data-act="decisionStart" data-id="${t.id}" data-key="${esc(key)}">شروع می‌کنم</button></div>
+  </section>`;
+}
+
+function decisionRejectPicker(id,key){
+  const t=decisionCandidates(S.tasks,TODAY()).find(x=>x.id===id&&decisionKey(x)===key)||byId(id);if(!t)return;
+  pk.classList.remove('cat-mode');pkbx.classList.remove('cat-mode');
+  const reasons=[['no-time','وقت ندارم'],['no-energy','انرژی ندارم'],['blocked','شرایطش فراهم نیست'],['other','دلیل دیگر']];
+  pkbx.innerHTML=`<h4>چرا الان نمی‌تونی؟</h4><div class="decision-reject-note">فقط برای بهترشدن پیشنهادهای بعدی ذخیره می‌شود.</div>`+reasons.map((r,i)=>`<button class="op" data-i="${i}">${r[1]}</button>`).join('');
+  pkbx.querySelectorAll('.op').forEach((b,i)=>b.onclick=()=>{recordDecisionEvent('reject',t,reasons[i][0]);pk.classList.remove('show');render();toast('متوجه شدم؛ یک گزینه مناسب‌تر بررسی کردم.',2600)});
+  pk.classList.add('show');
 }
 
 function plannerPage(overdue,list,doneN,today){
@@ -236,7 +258,7 @@ function catView(){
 
 /* ================= backup / restore ================= */
 function doBackup(){
-  const data={app:'karnama',v:2,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN,study:STUDY};
+  const data={app:'karnama',v:3,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN,study:STUDY,decision:DECISION};
   const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');
   const j=jparts(TODAY());
@@ -255,6 +277,7 @@ function doRestore(file){
       S.tasks=mergeSeries(d.tasks);
       if(d.learn&&typeof d.learn==='object'){LEARN=d.learn;saveLearn()}
       if(Array.isArray(d.study)){STUDY=d.study;saveStudy()}
+      if(d.decision&&typeof d.decision==='object')restoreDecision(d.decision);
       save();S.cat=null;render();
       toast('بازیابی شد.',3000);
     }catch(e){toast('این فایل پشتیبانِ کارنما نیست.',3500)}
@@ -445,14 +468,14 @@ sb.onclick=()=>{
   {const auto=classify(txt);if(g.c!==auto.c)learnCat(txt,g.c);}
   if(S.edit){
     const t=byId(S.edit);
-    const changes={title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null};
+    const changes={title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,meta:Object.assign({},t&&t.meta||{},g.meta||{})};
     if(duplicateOf(changes,S.edit)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
     if(t)Object.assign(t,changes);
     save();closeSheet();S.day=g.date;S.pv=null;S.edit=null;dr.value='';render();
     toast('تغییرات ذخیره شد.',2600);
     return;
   }
-  const newTask={id:Date.now(),title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0};
+  const newTask={id:Date.now(),title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0,meta:g.meta||{}};
   if(duplicateOf(newTask)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
   S.tasks.push(newTask);
   save();closeSheet();S.tab=g.date===addDays(today,1)?1:0;S.day=g.date;S.pv=null;dr.value='';render();
