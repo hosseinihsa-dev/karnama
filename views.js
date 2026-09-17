@@ -11,6 +11,10 @@ function advisorTaskPool(date=TODAY()){
   (STUDY||[]).filter(p=>studyRemaining(p)>0&&studyActive(p,date)).forEach(p=>tasks.push({id:-Math.abs(+p.id||1),title:`مطالعه ${p.title}`,note:`برنامه مطالعه ${p.title}`,c:1,p:1,s:slot,date,done:false,rep:null,time:null,meta:{advisorStudy:true,studyId:p.id}}));
   return tasks;
 }
+function chooseAdvisorTask(date=TODAY()){
+  const regular=chooseNextTask(S.tasks,date);if(regular)return regular;
+  const studyOnly=advisorTaskPool(date).filter(t=>t.meta&&t.meta.advisorStudy);return chooseNextTask(studyOnly,date);
+}
 
 /* ================= render ================= */
 function render(){
@@ -63,7 +67,7 @@ function render(){
 }
 
 function advisorHome(overdue,list,doneN,today){
-  const x=chooseNextTask(advisorTaskPool(today),today),chat=(S.advisorChat||[]).slice(-6);
+  const x=chooseAdvisorTask(today),chat=(S.advisorChat||[]).slice(-6);
   if(x)recordSuggestedBehavior(x.task,x);
   const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2><p>${esc(x.reason)}</p><div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionStart" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">شروع می‌کنم</button></div></div>`:`<div class="advisor-proposal empty"><h2>فعلاً پیشنهاد مشخصی ندارم</h2><p>هر کاری توی ذهنت هست بنویس یا بگو.</p></div>`;
   return `<section class="coach-home"><div class="coach-glow"></div><div class="coach-orb"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 7c6 0 10 3 13 8 3-5 7-8 13-8v7c-6 0-9 4-9 10v10h-8V24c0-6-3-10-9-10z"/></svg></div><h2 class="coach-question">الان دوست داری<br>روی چی تمرکز کنیم؟</h2><div class="coach-hints"><button data-advisor-text="الان چیکار کنم؟">الان چیکار کنم؟</button><button data-advisor-text="یه کار سبک‌تر بده">یک کار سبک‌تر</button><button data-advisor-text="کارهای امروز رو بگو">کارهای امروز</button></div>${proposal}${chat.length?`<div class="advisor-messages">${chat.map(m=>`<div class="advisor-msg ${m.role}">${esc(m.text)}</div>`).join('')}</div>`:''}<div class="coach-compose"><button class="coach-plus" id="coach-plus" aria-label="افزودن کار با جزئیات">+</button><textarea id="advisor-input" rows="1" aria-label="پیام به کارنما" placeholder="هرچی توی ذهنته بنویس..."></textarea><button id="advisor-send" aria-label="فرستادن پیام"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button><button id="advisor-voice" aria-label="گفت‌وگوی صوتی با کارنما"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4m7-4a7 7 0 0 1-14 0m7 7v4m-4 0h8"/></svg></button></div></section><div id="voice-stage" class="voice-stage" aria-hidden="true"><div class="voice-stage-glow"></div><button id="voice-close" aria-label="بستن شنیدن صدا">×</button><span>کارنما گوش می‌دهد...</span><div class="voice-orb"></div><p id="voice-transcript">صحبت کن؛ اگر کار باشد خودکار ثبتش می‌کنم.</p><button id="voice-stop" aria-label="پایان ضبط"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4m7-4a7 7 0 0 1-14 0m7 7v4"/></svg></button></div>`;
@@ -159,7 +163,7 @@ function decisionRejectPicker(id,key){
 const ADVISOR_CHAT_KEY='karnama.advisor.chat.v1';let ACTIVE_SPEECH=null;
 try{if(!S.advisorChat.length){const saved=JSON.parse(localStorage.getItem(ADVISOR_CHAT_KEY));if(Array.isArray(saved))S.advisorChat=saved.slice(-24)}}catch(e){}
 function advisorSay(role,text){S.advisorChat=S.advisorChat||[];S.advisorChat.push({role,text,at:new Date().toISOString()});if(S.advisorChat.length>24)S.advisorChat=S.advisorChat.slice(-24);try{localStorage.setItem(ADVISOR_CHAT_KEY,JSON.stringify(S.advisorChat))}catch(e){}}
-function advisorNextText(){const n=chooseNextTask(advisorTaskPool(),TODAY());return n?`پیشنهاد بعدی من «${n.task.title}» است؛ ${n.reason}.`:'فعلاً کار مشخص دیگری ندارم که با اطمینان پیشنهاد بدهم.'}
+function advisorNextText(){const n=chooseAdvisorTask();return n?`پیشنهاد بعدی من «${n.task.title}» است؛ ${n.reason}.`:'فعلاً کار مشخص دیگری ندارم که با اطمینان پیشنهاد بدهم.'}
 function advisorTaskReference(text,current){
   const n=norm(text),active=S.tasks.filter(t=>!t.done);if(/(?:این|همین|این یکی|همین یکی)s*(?:کار)?/.test(n)&&current)return current;
   const ignored=new Set(['نه','ولی','اما','به','نظرم','فکر','میکنم','می‌کنم','کار','اون','آن','این','خیلی','واقعا','واقعاً','مهم','مهمتره','مهم‌تره','اولویت','بالاتره','بالاتر','بیشتره','بیشتر','چون','رو','را']);
@@ -171,7 +175,7 @@ function setExplicitTaskPriority(task,text,level='high'){
   task.p=level==='high'?0:2;task.meta=task.meta&&typeof task.meta==='object'?task.meta:{};task.meta.importance=level;task.meta.importanceReason=text;task.meta.explicitPriority={level,at:new Date().toISOString(),evidence:text,source:'explicit-chat'};
   const context=Object.assign({version:1},taskContext(task)||extractTaskContext(task.note||task.title,{date:task.date}));context.importance=contextFact(level==='high'?'important':'low',text,'explicit-chat',1);task.meta.context=updateContextUnknown(context);save();
 }
-function advisorPriorityReply(target){const next=chooseNextTask(advisorTaskPool(),TODAY()),state=assessNowFeasibility(target,{date:TODAY()});if(next&&next.task.id===target.id)return `«${target.title}» را با اولویت بالاتر ثبت کردم و حالا پیشنهاد اصلی من همین کار است.`;if(state.status!=='available')return `اولویت «${target.title}» را بالاتر ثبت کردم؛ اما الآن پیشنهاد اصلی‌اش نکردم، چون ${state.reason}. ${advisorNextText()}`;return `اولویت «${target.title}» را بالاتر ثبت کردم. ${advisorNextText()}`}
+function advisorPriorityReply(target){const next=chooseAdvisorTask(),state=assessNowFeasibility(target,{date:TODAY()});if(next&&next.task.id===target.id)return `«${target.title}» را با اولویت بالاتر ثبت کردم و حالا پیشنهاد اصلی من همین کار است.`;if(state.status!=='available')return `اولویت «${target.title}» را بالاتر ثبت کردم؛ اما الآن پیشنهاد اصلی‌اش نکردم، چون ${state.reason}. ${advisorNextText()}`;return `اولویت «${target.title}» را بالاتر ثبت کردم. ${advisorNextText()}`}
 function advisorTaskIntent(text){
   const t=norm(text).trim();if(!t)return false;
   if(/[؟?]$/.test(t)||/^(چرا|چطور|چجوری|چی|چه |آیا|میشه|می‌شه|میتونی|می‌تونی|به نظرت|راهنمایی)/.test(t))return false;
@@ -193,7 +197,7 @@ function setChatPrerequisite(t,text){
 }
 function handleAdvisorMessage(raw){
   const text=raw.trim();if(!text)return;advisorSay('user',text);
-  const before=chooseNextTask(advisorTaskPool(),TODAY()),current=before&&before.task&&byId(before.task.id);
+  const before=chooseAdvisorTask(),current=before&&before.task&&byId(before.task.id);
   if(S.advisorPending&&S.advisorPending.kind==='priority-target'){
     const target=advisorTaskReference(text,current);S.advisorPending=null;if(target){setExplicitTaskPriority(target,text);advisorSay('assistant',advisorPriorityReply(target))}else advisorSay('assistant','هنوز نتوانستم کار موردنظرت را پیدا کنم؛ اسمش را دقیق‌تر بگو یا از بخش «کارها» انتخابش کن.');render();return
   }
@@ -204,7 +208,7 @@ function handleAdvisorMessage(raw){
   if(advisorTaskIntent(text)){
     const made=addTaskFromAdvisor(text);if(made.duplicate)advisorSay('assistant',`«${made.task.title}» از قبل در کارهایت هست.`);else{const t=made.task,when=t.date===TODAY()?'امروز':t.date===addDays(TODAY(),1)?'فردا':fa(jdate(t.date));advisorSay('assistant',`فهمیدم که این یک کار است؛ «${t.title}» را برای ${when}${t.time?' ساعت '+fa(t.time):''} در «${CATS[t.c].name}» ثبت کردم.`)}render();return
   }
-  const x=chooseNextTask(advisorTaskPool(),TODAY()),t=x&&x.task,base=t&&byId(t.id);if(!t){advisorSay('assistant','فعلاً پیشنهادی ندارم؛ اگر کاری در ذهنت هست طبیعی بنویس تا ثبتش کنم.');render();return}
+  const x=chooseAdvisorTask(),t=x&&x.task,base=t&&byId(t.id);if(!t){advisorSay('assistant','فعلاً پیشنهادی ندارم؛ اگر کاری در ذهنت هست طبیعی بنویس تا ثبتش کنم.');render();return}
   S.advisorContext={taskId:t.id,taskKey:decisionKey(t),at:new Date().toISOString()};
   if(/^(سلام|سلام خوبی|خوبی|چه خبر)/.test(norm(text))){advisorSay('assistant',`سلام. حواسم به کارهایت هست؛ الآن پیشنهادم «${t.title}» است. می‌خواهی دلیلش را بگویم یا گزینه دیگری پیدا کنم؟`);render();return}
   if(/^(مرسی|ممنون|دمت گرم|باشه ممنون)/.test(norm(text))){advisorSay('assistant','خواهش می‌کنم. هر تغییری در شرایطت پیش آمد همین‌جا بگو تا پیشنهاد را دوباره تنظیم کنم.');render();return}
