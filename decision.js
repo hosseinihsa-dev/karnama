@@ -33,6 +33,8 @@ function assessNowFeasibility(t,{date=TODAY(),nowMin=decisionNowMinutes()}={}){
 
   const remembered=userMemorySignal(t,nowMin);
   if(remembered&&remembered.hard)return result(FEASIBLE_NOW.NO,`طبق چیزی که گفته‌ای: ${remembered.reason}`,'user-memory-explicit',remembered.memory.confidence);
+  const context=taskContext(t);
+  if(context&&context.prerequisite&&context.prerequisite.value)return result(FEASIBLE_NOW.UNKNOWN,'این کار پیش‌نیازی دارد که انجام‌شدنش هنوز مشخص نیست','explicit-prerequisite',.65);
 
   const external=/آتلیه|فروشگاه|مغازه|اداره|بانک|دفتر|مطب|پست|داروخانه|خرید حضوری|تحویل\s*(?:بگیر|بگیرم)|مراجعه/.test(text)||[3,7].includes(t.c);
   const otherPerson=/تماس|زنگ\s*(?:بزن|بزنم)|صحبت\s+با|جلسه|قرار|ملاقات|از\s+.+\s+بپرس|به\s+.+\s+پیام/.test(text)||t.c===0;
@@ -45,17 +47,17 @@ function assessNowFeasibility(t,{date=TODAY(),nowMin=decisionNowMinutes()}={}){
   return result(FEASIBLE_NOW.UNKNOWN,'اطلاعات کافی برای تشخیص قطعی امکان انجام وجود ندارد','insufficient-data',.3);
 }
 
+const decisionFingerprint=t=>JSON.stringify([t.title||'',t.note||'',t.date||'',t.time||'',t.s,t.p,t.c,taskContext(t)||null]);
 function recentDecisionRejections(date=TODAY()){
-  const set=new Set();
-  DECISION.feedback.forEach(x=>{if(x&&x.date===date&&x.kind==='reject'&&x.taskKey)set.add(x.taskKey)});
-  return set;
+  const map=new Map();DECISION.feedback.forEach(x=>{if(x&&x.date===date&&x.kind==='reject'&&x.taskKey)map.set(x.taskKey,x.fingerprint||null)});return map;
 }
 
 function decisionCandidates(tasks,date=TODAY(),nowMin=decisionNowMinutes()){
   const rejected=recentDecisionRejections(date),byKey=new Map();
   const add=t=>{
-    if(!t||t.done||rejected.has(decisionKey(t)))return;
-    const k=decisionKey(t);if(!byKey.has(k))byKey.set(k,t);
+    const k=decisionKey(t),rejectedFingerprint=rejected.get(k);
+    if(!t||t.done||(rejected.has(k)&&(!rejectedFingerprint||rejectedFingerprint===decisionFingerprint(t))))return;
+    if(!byKey.has(k))byKey.set(k,t);
   };
   /* نوبت‌های معتبر امروز، از جمله تکرارهای چندساعته؛ مستقل از وضعیت نمای فعلی اپ */
   (tasks||[]).forEach(t=>{
@@ -75,48 +77,58 @@ function decisionCandidates(tasks,date=TODAY(),nowMin=decisionNowMinutes()){
 }
 
 function contextPrioritySignals(t,date=TODAY()){
-  const c=taskContext(t);if(!c)return {score:0,reasons:[]};
-  let score=0;const reasons=[];
-  if(c.deadline&&c.deadline.value){
-    const d=diffDays(c.deadline.value,date);
-    if(d<0){score+=34;reasons.push({w:98,text:'مهلت ثبت‌شده‌اش گذشته است'})}
-    else if(d===0){score+=32;reasons.push({w:96,text:'امروز مهلت دارد'})}
-    else if(d===1){score+=27;reasons.push({w:94,text:'تا فردا مهلت دارد'})}
-    else if(d<=3){score+=20;reasons.push({w:90,text:`تا ${fa(jdate(c.deadline.value))} مهلت دارد`})}
-    else {score+=8;reasons.push({w:60,text:`تا ${fa(jdate(c.deadline.value))} مهلت دارد`})}
-  }
-  if(c.delayConsequence&&c.delayConsequence.value){score+=24;reasons.push({w:92,text:`تأخیر می‌تواند باعث «${c.delayConsequence.value}» شود`})}
-  if(c.dependency&&c.dependency.value){score+=19;reasons.push({w:91,text:c.dependency.value})}
-  if(c.opportunity&&c.opportunity.value){score+=17;reasons.push({w:88,text:`فرصت مرتبط در خطر است: ${c.opportunity.value}`})}
-  if(c.commitment&&c.commitment.value){score+=14;reasons.push({w:82,text:`تعهد به دیگری در متن آمده: ${c.commitment.value}`})}
-  if(c.importance&&c.importance.value&&!decisionMeta(t).importance&&!decisionMeta(t).urgency){score+=10;reasons.push({w:70,text:'اهمیت آن صریحاً در متن ثبت شده است'})}
-  return {score,reasons};
+  const urgency=decisionUrgency(t,date,decisionNowMinutes()),impact=decisionImpact(t);
+  return {score:urgency.weight+impact.weight,reasons:[...urgency.signals,...impact.signals]};
+}
+
+function decisionUrgency(t,date,nowMin){
+  const context=taskContext(t)||{},signals=[];let level=0,weight=0;
+  if(context.deadline&&context.deadline.value){const d=diffDays(context.deadline.value,date);
+    if(d<0){level=5;weight+=100;signals.push({w:100,text:'مهلت ثبت‌شده‌اش گذشته است',source:'deadline'})}
+    else if(d===0){level=5;weight+=96;signals.push({w:96,text:'امروز مهلت دارد',source:'deadline'})}
+    else if(d===1){level=4;weight+=90;signals.push({w:90,text:'تا فردا مهلت دارد',source:'deadline'})}
+    else if(d<=3){level=3;weight+=76;signals.push({w:76,text:`تا ${fa(jdate(context.deadline.value))} مهلت دارد`,source:'deadline'})}
+    else {level=Math.max(level,1);weight+=35;signals.push({w:35,text:`تا ${fa(jdate(context.deadline.value))} مهلت دارد`,source:'deadline'})}}
+  const late=diffDays(date,t.date);if(late>0){level=Math.max(level,3);weight+=55+Math.min(20,late*4);signals.push({w:72,text:`${fa(late)} روز عقب افتاده`,source:'scheduled-late'})}
+  if(t.time&&t.date<=date){const m=tmin(t);if(m!==null&&m<=nowMin+5){level=Math.max(level,4);weight+=82;signals.push({w:98,text:nowMin>=m?'زمان انجامش رسیده':'زمانش خیلی نزدیک است',source:'explicit-time'})}}
+  if(context.delayConsequence&&context.delayConsequence.value){level=Math.max(level,4);weight+=68;signals.push({w:92,text:`تأخیر می‌تواند باعث «${context.delayConsequence.value}» شود`,source:'delay-consequence'})}
+  if(context.commitment&&context.commitment.value){level=Math.max(level,2);weight+=42;signals.push({w:80,text:`تعهد ثبت‌شده: ${context.commitment.value}`,source:'commitment'})}
+  return {level,weight,signals};
+}
+
+function decisionImpact(t){
+  const context=taskContext(t)||{},signals=[];let level=0,weight=0;
+  if(context.dependency&&context.dependency.value){level=Math.max(level,4);weight+=70;signals.push({w:91,text:context.dependency.value,source:'dependency'})}
+  if(context.delayConsequence&&context.delayConsequence.value){level=Math.max(level,4);weight+=64;signals.push({w:90,text:`از پیامد «${context.delayConsequence.value}» جلوگیری می‌کند`,source:'consequence'})}
+  if(context.opportunity&&context.opportunity.value){level=Math.max(level,3);weight+=52;signals.push({w:86,text:`فرصت مرتبط را حفظ می‌کند: ${context.opportunity.value}`,source:'opportunity'})}
+  return {level,weight,signals};
+}
+
+function humanDecisionReason(trace){
+  const real=[...trace.urgency.signals,...trace.impact.signals].sort((a,b)=>b.w-a.w),personal=trace.personal.signals||[],manual=trace.manual.signals||[];
+  const picked=[];for(const x of real){if(!picked.some(y=>y.source===x.source)){picked.push(x);if(picked.length===2)break}}
+  if(picked.length<2&&manual.length)picked.push(manual[0]);
+  if(!picked.length&&personal.length&&trace.personal.score>0)picked.push(personal[0]);
+  if(!picked.length&&trace.feasibility.status===FEASIBLE_NOW.YES)picked.push({text:'الآن قابل انجام است',source:'feasibility'});
+  return picked.slice(0,2).map(x=>x.text).join(' و ')||'اطلاعات کافی برای یک دلیل قوی ندارم';
+}
+
+function buildDecisionTrace(t,date=TODAY(),nowMin=decisionNowMinutes()){
+  const feasibility=assessNowFeasibility(t,{date,nowMin}),urgency=decisionUrgency(t,date,nowMin),impact=decisionImpact(t),remembered=userMemorySignal(t,nowMin),behavior=behaviorSignalForTask(t,nowMin),personalSignals=[];
+  let personalScore=behavior.score;if(remembered&&!remembered.hard){personalScore+=remembered.score;personalSignals.push({w:60,text:remembered.reason,source:'memory'})}personalSignals.push(...behavior.reasons.map(x=>Object.assign({source:'behavior'},x)));personalScore=Math.max(-12,Math.min(12,personalScore));
+  const meta=decisionMeta(t),manualSignals=[];let manualLevel=0;if(t.p===0){manualLevel=2;manualSignals.push({w:50,text:'اولویت دستی بالایی دارد',source:'manual'})}else if(t.p===1)manualLevel=1;
+  if(meta.importance==='high'||meta.urgency==='high'){manualLevel=Math.max(2,manualLevel);manualSignals.push({w:52,text:meta.urgencyReason||meta.importanceReason||'به‌صورت دستی مهم ثبت شده',source:'manual-meta'})}
+  const trace={taskKey:decisionKey(t),feasibility,urgency,impact,personal:{score:personalScore,signals:personalSignals},manual:{level:manualLevel,signals:manualSignals},dataQuality:'insufficient',result:null};
+  const realEvidence=urgency.signals.length+impact.signals.length;trace.dataQuality=feasibility.status===FEASIBLE_NOW.UNKNOWN?'insufficient':realEvidence>=2?'high':realEvidence||manualSignals.length?'medium':'insufficient';
+  trace.result=feasibility.status===FEASIBLE_NOW.NO?'کنار گذاشته شد':urgency.level>=4||impact.level>=4?'کاندیدای بسیار مناسب':urgency.level>=2||impact.level>=2?'کاندیدای مناسب':'کاندیدای قابل بررسی';return trace;
 }
 
 function evaluateDecisionTask(t,date=TODAY(),nowMin=decisionNowMinutes()){
-  let score=0;const reasons=[];const late=diffDays(date,t.date),meta=decisionMeta(t);
+  const trace=buildDecisionTrace(t,date,nowMin),late=diffDays(date,t.date),meta=decisionMeta(t);
   const duration=Number.isFinite(+meta.durationMin)&&+meta.durationMin>0?+meta.durationMin:null;
-  if(late>0){score+=50+Math.min(30,late*6);reasons.push({w:90,text:`${fa(late)} روز عقب افتاده`})}
-  else if(t.date===date){score+=26;reasons.push({w:35,text:'برای امروز برنامه‌ریزی شده'})}
-  else if(t.date===addDays(date,1)){score+=12;reasons.push({w:55,text:'ددلاینش فرداست'})}
-  if(t.p===0){score+=32;reasons.push({w:75,text:'اولویت بالایی دارد'})}
-  else if(t.p===1)score+=14;
-  if(t.time&&t.date<=date){const m=tmin(t);if(m!==null&&m<=nowMin+5){const passed=nowMin-m;score+=passed>=0?34:18;reasons.push({w:100,text:passed>=0?'زمان انجامش رسیده':'زمانش خیلی نزدیک است'})}}
-  if(t.rep){score+=8;reasons.push({w:40,text:t.doseAll>1?'نوبت فعلی یک کار تکرارشونده است':'کار تکرارشونده امروز است'})}
-  if((t.moved||0)>1){score+=Math.min(14,(t.moved||0)*3);reasons.push({w:58,text:'چند بار جابه‌جا شده'})}
-  if(meta.importance==='high'){score+=14;reasons.push({w:72,text:meta.importanceReason||'قبلاً مهم ثبت شده'})}
-  if(meta.urgency==='high'){score+=12;reasons.push({w:78,text:meta.urgencyReason||'فوریت آن در توضیح کار مشخص است'})}
-  if(duration&&duration<=30){score+=5;reasons.push({w:20,text:`${fa(duration)} دقیقه زمان ثبت شده`})}
-  const context=contextPrioritySignals(t,date);score+=context.score;reasons.push(...context.reasons);
-  const remembered=userMemorySignal(t,nowMin);
-  if(remembered&&!remembered.hard){score+=remembered.score;reasons.push({w:remembered.score<0?45:65,text:`با توجه به شناخت قبلی: ${remembered.reason}`})}
-  const behavior=behaviorSignalForTask(t,nowMin);score+=behavior.score;reasons.push(...behavior.reasons);
-  reasons.sort((a,b)=>b.w-a.w);
-  const real=context.reasons.sort((a,b)=>b.w-a.w).slice(0,2);
-  let reason=real.length?real.map(x=>x.text).join(' و '):(reasons[0]?reasons[0].text:'در میان کارهای باز، مناسب‌ترین گزینه فعلی است');
-  if(!real.length&&late>0&&t.p===0)reason='این کار عقب افتاده و اولویت بالایی دارد';
-  else if(!real.length&&t.date===addDays(date,1))reason='ددلاینش فرداست و هنوز انجام نشده';
-  return {task:t,score,reason,duration};
+  const score=trace.urgency.weight+trace.impact.weight+trace.personal.score+trace.manual.level*8+(late>0?Math.min(12,late*2):0);
+  let reason=humanDecisionReason(trace);if(!trace.urgency.signals.length&&!trace.impact.signals.length&&late>0&&t.p===0)reason=`${fa(late)} روز عقب افتاده و اولویت دستی بالایی دارد`;
+  return {task:t,score,reason,duration,trace};
 }
 
 function partitionDecisionCandidates(tasks,date=TODAY(),nowMin=decisionNowMinutes()){
@@ -130,16 +142,23 @@ function partitionDecisionCandidates(tasks,date=TODAY(),nowMin=decisionNowMinute
 
 function chooseNextTask(tasks,date=TODAY(),nowMin=decisionNowMinutes()){
   const groups=partitionDecisionCandidates(tasks,date,nowMin);
-  /* نامشخص حذف نمی‌شود؛ فقط وقتی گزینه مطمئن داریم، گزینه مطمئن‌تر مقدم است. */
   const pool=groups.available.length?groups.available:groups.unknown;
   const ranked=pool.map(x=>Object.assign(evaluateDecisionTask(x.task,date,nowMin),{feasibility:x.feasibility}))
-    .sort((a,b)=>b.score-a.score||(a.task.p-b.task.p)||(a.duration-b.duration)||(a.task.id-b.task.id));
-  return ranked[0]||null;
+    .sort((a,b)=>b.trace.urgency.level-a.trace.urgency.level||b.trace.urgency.weight-a.trace.urgency.weight||b.trace.impact.level-a.trace.impact.level||b.trace.impact.weight-a.trace.impact.weight||b.trace.personal.score-a.trace.personal.score||b.trace.manual.level-a.trace.manual.level||((a.duration||Infinity)-(b.duration||Infinity))||(a.task.id-b.task.id));
+  const top=ranked[0];if(!top)return null;const runner=ranked[1];let confidence='medium';
+  if(top.feasibility.status===FEASIBLE_NOW.UNKNOWN||top.trace.dataQuality==='insufficient')confidence='insufficient';
+  else if(!runner||top.trace.urgency.level>=runner.trace.urgency.level+2||top.trace.impact.level>=runner.trace.impact.level+2)confidence='high';
+  else if(top.trace.urgency.level===runner.trace.urgency.level&&top.trace.impact.level===runner.trace.impact.level&&Math.abs(top.score-runner.score)<8)confidence='insufficient';
+  top.confidence=confidence;top.trace.confidence=confidence;
+  if(confidence==='insufficient')top.reason=top.reason==='الآن قابل انجام است'?'با اطلاعات فعلی، این گزینه کمی مناسب‌تر به‌نظر می‌رسد':`با اطلاعات فعلی، ${top.reason}`;
+  const blocked=groups.blocked.map(x=>Object.assign(evaluateDecisionTask(x.task,date,nowMin),{feasibility:x.feasibility})).filter(x=>x.trace.urgency.level>=4||x.trace.impact.level>=4).sort((a,b)=>b.trace.urgency.level-a.trace.urgency.level||b.trace.impact.level-a.trace.impact.level)[0];
+  if(blocked)top.secondaryWarning={task:blocked.task,reason:blocked.feasibility.reason};
+  return top;
 }
 
 function recordDecisionEvent(kind,t,detail){
   if(!t)return;
-  const e={at:new Date().toISOString(),date:TODAY(),kind,taskId:t.id,taskKey:decisionKey(t),category:t.c,taskText:`${t.title||''} ${t.note||''}`.trim(),detail:detail||null};
+  const e={at:new Date().toISOString(),date:TODAY(),kind,taskId:t.id,taskKey:decisionKey(t),fingerprint:decisionFingerprint(t),category:t.c,taskText:`${t.title||''} ${t.note||''}`.trim(),detail:detail||null};
   if(kind==='reject')DECISION.feedback.push(e);else DECISION.history.push(e);
   if(DECISION.feedback.length>500)DECISION.feedback=DECISION.feedback.slice(-500);
   if(DECISION.history.length>500)DECISION.history=DECISION.history.slice(-500);

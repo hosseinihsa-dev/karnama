@@ -107,6 +107,7 @@ function decisionPanel(today){
     <div class="decision-meta"><span>${CATS[t.c].name}${when}</span>${x.duration?`<span>${fa(x.duration)} دقیقه</span>`:''}</div>
     <p class="decision-reason">${esc(x.reason)}</p>
     <div class="decision-actions"><button class="decision-later" data-act="decisionReject" data-id="${t.id}" data-key="${esc(key)}">الان نمی‌تونم</button><button class="decision-start" data-act="decisionStart" data-id="${t.id}" data-key="${esc(key)}">شروع می‌کنم</button></div>
+    ${x.secondaryWarning?`<div class="decision-secondary"><b>برای بعد یادت باشد:</b> «${esc(x.secondaryWarning.task.title)}» مهم است، اما الآن ${esc(x.secondaryWarning.reason)}</div>`:''}
   </section>`;
 }
 
