@@ -263,7 +263,7 @@ function catView(){
 
 /* ================= backup / restore ================= */
 function doBackup(){
-  const data={app:'karnama',v:4,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN,study:STUDY,decision:DECISION};
+  const data={app:'karnama',v:5,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN,study:STUDY,decision:DECISION,userMemory:USER_MEMORY};
   const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');
   const j=jparts(TODAY());
@@ -283,6 +283,7 @@ function doRestore(file){
       if(d.learn&&typeof d.learn==='object'){LEARN=d.learn;saveLearn()}
       if(Array.isArray(d.study)){STUDY=d.study;saveStudy()}
       if(d.decision&&typeof d.decision==='object')restoreDecision(d.decision);
+      if(d.userMemory&&typeof d.userMemory==='object')restoreUserMemory(d.userMemory);
       save();S.cat=null;render();
       toast('بازیابی شد.',3000);
     }catch(e){toast('این فایل پشتیبانِ کارنما نیست.',3500)}
@@ -365,9 +366,10 @@ if(mic){
 
 /* --- picker --- */
 const pk=document.getElementById('pick'),pkbx=pk.querySelector('.bx');
-pk.querySelector('.bd').onclick=()=>{if(typeof pk._onDismiss==='function')pk._onDismiss();pk._onDismiss=null;pk.classList.remove('show')};
+pk.querySelector('.bd').onclick=()=>{if(typeof pk._onDismiss==='function')pk._onDismiss();pk._onDismiss=null;pk.classList.remove('show');pkbx.classList.remove('memory-box')};
 function picker(f){
   pk._onDismiss=null;
+  pkbx.classList.remove('memory-box');
   const g=S.pv,today=TODAY();
   pk.classList.toggle('cat-mode',f==='c');
   pkbx.classList.toggle('cat-mode',f==='c');
@@ -487,6 +489,7 @@ function amountPicker(id){
 
 function clarificationPicker(t,q,entry){
   if(!t||!q||!entry)return;
+  pkbx.classList.remove('memory-box');
   const dismiss=()=>{if(skipClarification(t,entry.id)){save();toast('کار ثبت شد؛ فعلاً بدون پاسخ ادامه می‌دهیم.',2600)}};
   pk.classList.remove('cat-mode');pkbx.classList.remove('cat-mode');pk._onDismiss=dismiss;
   pkbx.innerHTML=`<div class="clarify-kicker">یک سؤال کوتاه و اختیاری</div><h4>${esc(q.question)}</h4><div class="clarify-note">کار همین حالا ثبت شده؛ پاسخ فقط کمک می‌کند پیشنهادهای همین کار دقیق‌تر شوند.</div>
@@ -499,6 +502,18 @@ function clarificationPicker(t,q,entry){
     if(answerClarification(t,entry.id,input.value)){save();pk._onDismiss=null;pk.classList.remove('show');render();toast('پاسخ به زمینه همین کار اضافه شد.',2800)}
   };
   pk.classList.add('show');setTimeout(()=>input.focus(),80);
+}
+
+function userMemoryPicker(){
+  pk._onDismiss=null;pk.classList.remove('cat-mode');pkbx.classList.remove('cat-mode');pkbx.classList.add('memory-box');
+  const items=activeUserMemories().sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  pkbx.innerHTML=`<div class="memory-head"><div><div class="clarify-kicker">حافظه محلی و خصوصی</div><h4>چیزهایی که کارنما درباره من یاد گرفته</h4></div><span>${fa(items.length)} مورد</span></div>
+    <div class="memory-note">این اطلاعات فقط روی همین دستگاه است و برای بهترشدن پیشنهادها استفاده می‌شود.</div>
+    <div class="memory-list">${items.length?items.map(m=>`<div class="memory-item"><div><span class="memory-source ${m.source}">${m.source==='explicit'?'خودت گفتی':'از چند رفتار مشابه'}</span><b>${esc(m.label)}</b><small>${m.source==='inferred'?`اطمینان ${fa(Math.round((m.confidence||0)*100))}٪ · ${fa(m.support||0)} شاهد`:'اطلاعات صریح با اعتبار بالا'}</small></div><button data-memory-delete="${esc(m.id)}" aria-label="حذف این حافظه">حذف</button></div>`).join(''):'<div class="memory-empty">هنوز الگوی قابل اتکایی یاد نگرفته‌ام.</div>'}</div>
+    <button class="memory-close" data-memory-close="1">بستن</button>`;
+  pkbx.querySelectorAll('[data-memory-delete]').forEach(b=>b.onclick=()=>{if(deleteUserMemory(b.dataset.memoryDelete)){userMemoryPicker();toast('این حافظه حذف شد؛ کارها و تاریخچه تغییری نکردند.',2800)}});
+  pkbx.querySelector('[data-memory-close]').onclick=()=>{pk.classList.remove('show');pkbx.classList.remove('memory-box')};
+  pk.classList.add('show');
 }
 
 sb.onclick=()=>{
@@ -543,6 +558,7 @@ sideMenu.querySelector('.side-scrim').onclick=closeMenu;
 document.getElementById('menu-categories').onclick=()=>{S.tab=4;S.cat=null;closeMenu();render()};
 document.getElementById('menu-week').onclick=()=>{S.tab=2;S.day=TODAY();closeMenu();render()};
 document.getElementById('menu-planner').onclick=()=>{S.tab=6;S.planPreview=true;closeMenu();render()};
+document.getElementById('menu-memory').onclick=()=>{closeMenu();userMemoryPicker()};
 document.getElementById('side-backup').onclick=()=>{closeMenu();doBackup()};
 document.getElementById('side-restore').onclick=()=>{closeMenu();if(impEl)impEl.click()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sideMenu.classList.contains('show'))closeMenu()});

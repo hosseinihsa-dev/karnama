@@ -31,6 +31,9 @@ function assessNowFeasibility(t,{date=TODAY(),nowMin=decisionNowMinutes()}={}){
     return result(FEASIBLE_NOW.YES,'زمان ثبت‌شده کار رسیده است','explicit-time',1);
   }
 
+  const remembered=userMemorySignal(t,nowMin);
+  if(remembered&&remembered.hard)return result(FEASIBLE_NOW.NO,`طبق چیزی که گفته‌ای: ${remembered.reason}`,'user-memory-explicit',remembered.memory.confidence);
+
   const external=/آتلیه|فروشگاه|مغازه|اداره|بانک|دفتر|مطب|پست|داروخانه|خرید حضوری|تحویل\s*(?:بگیر|بگیرم)|مراجعه/.test(text)||[3,7].includes(t.c);
   const otherPerson=/تماس|زنگ\s*(?:بزن|بزنم)|صحبت\s+با|جلسه|قرار|ملاقات|از\s+.+\s+بپرس|به\s+.+\s+پیام/.test(text)||t.c===0;
   const independent=/مطالعه|کتاب|بنویس|بنویسم|نوشتن|گزارش|طراحی|مرتب|دسته.?بندی|برنامه.?ریزی|یادداشت|تمرین|آموزش|نظافت|خانه|خونه/.test(text)||[1,4,5,9,11].includes(t.c);
@@ -105,6 +108,8 @@ function evaluateDecisionTask(t,date=TODAY(),nowMin=decisionNowMinutes()){
   if(meta.urgency==='high'){score+=12;reasons.push({w:78,text:meta.urgencyReason||'فوریت آن در توضیح کار مشخص است'})}
   if(duration&&duration<=30){score+=5;reasons.push({w:20,text:`${fa(duration)} دقیقه زمان ثبت شده`})}
   const context=contextPrioritySignals(t,date);score+=context.score;reasons.push(...context.reasons);
+  const remembered=userMemorySignal(t,nowMin);
+  if(remembered&&!remembered.hard){score+=remembered.score;reasons.push({w:remembered.score<0?45:65,text:`با توجه به شناخت قبلی: ${remembered.reason}`})}
   reasons.sort((a,b)=>b.w-a.w);
   const real=context.reasons.sort((a,b)=>b.w-a.w).slice(0,2);
   let reason=real.length?real.map(x=>x.text).join(' و '):(reasons[0]?reasons[0].text:'در میان کارهای باز، مناسب‌ترین گزینه فعلی است');
@@ -138,6 +143,7 @@ function recordDecisionEvent(kind,t,detail){
   if(DECISION.feedback.length>500)DECISION.feedback=DECISION.feedback.slice(-500);
   if(DECISION.history.length>500)DECISION.history=DECISION.history.slice(-500);
   saveDecision();
+  observeUserMemoryEvent(kind,t,detail||{});
 }
 
 function restoreDecision(data){

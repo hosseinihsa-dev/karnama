@@ -10,7 +10,7 @@ function detectImportantAmbiguity(t){
   if(taskClarification(t).history.length)return null;
   const text=norm(`${t.title||''} ${t.note||''}`),context=taskContext(t)||{};
   const workDecision=/پروژه|طرح|سایت|قرارداد|گزارش|تحویل|مشتری|سفارش|ارائه|پیشنهاد/.test(text)||t.c===4;
-  const conversation=/صحبت\s+با|تماس\s+با|زنگ\s+(?:بزن|بزنم)|جلسه\s+با|هماهنگ\s+(?:کن|کنم)\s+با/.test(text)||t.c===0;
+  const conversation=/صحبت\s+با|با\s+[آ-ی‌]+(?:\s+[آ-ی‌]+){0,3}\s+(?:صحبت|هماهنگ)|تماس\s+با|زنگ\s+(?:بزن|بزنم)|جلسه\s+با|هماهنگ\s+(?:کن|کنم)\s+با/.test(text)||t.c===0;
   const simple=/خرید\s+(?:نان|نون|شیر|میوه)|قبض|قرص|دارو|پیاده.?روی|ورزش|مطالعه\s+کتاب|فیلم|سریال|نظافت/.test(text);
   if(simple)return null;
 
@@ -61,7 +61,7 @@ function answerClarification(t,entryId,answer){
     }
   }else if(entry.type==='consequence')extra.delayConsequence=contextFact(text,evidence,'explicit-answer',1);
   t.meta=t.meta&&typeof t.meta==='object'?t.meta:{};t.meta.context=mergeAnsweredContext(base,extra);
-  entry.status='answered';entry.answer=text;entry.answeredAt=new Date().toISOString();return true;
+  entry.status='answered';entry.answer=text;entry.answeredAt=new Date().toISOString();observeExplicitMemoryText(text,t,'clarification');return true;
 }
 
 function skipClarification(t,entryId){
