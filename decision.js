@@ -122,6 +122,8 @@ function buildDecisionTrace(t,date=TODAY(),nowMin=decisionNowMinutes()){
   let personalScore=behavior.score;if(remembered&&!remembered.hard){personalScore+=remembered.score;personalSignals.push({w:60,text:remembered.reason,source:'memory'})}personalSignals.push(...behavior.reasons.map(x=>Object.assign({source:'behavior'},x)));personalScore=Math.max(-12,Math.min(12,personalScore));
   const meta=decisionMeta(t),manualSignals=[];let manualLevel=0;if(t.p===0){manualLevel=2;manualSignals.push({w:50,text:'اولویت دستی بالایی دارد',source:'manual'})}else if(t.p===1)manualLevel=1;
   if(meta.importance==='high'||meta.urgency==='high'){manualLevel=Math.max(2,manualLevel);manualSignals.push({w:52,text:meta.urgencyReason||meta.importanceReason||'به‌صورت دستی مهم ثبت شده',source:'manual-meta'})}
+  if(meta.explicitPriority&&meta.explicitPriority.level==='high'){manualLevel=4;manualSignals.unshift({w:88,text:'خودت در گفت‌وگو گفتی این کار اولویت بالاتری دارد',source:'explicit-priority'})}
+  if(meta.explicitPriority&&meta.explicitPriority.level==='low')manualLevel=0;
   const trace={taskKey:decisionKey(t),feasibility,urgency,impact,personal:{score:personalScore,signals:personalSignals},manual:{level:manualLevel,signals:manualSignals},dataQuality:'insufficient',result:null};
   const realEvidence=urgency.signals.length+impact.signals.length;trace.dataQuality=feasibility.status===FEASIBLE_NOW.UNKNOWN?'insufficient':realEvidence>=2?'high':realEvidence||manualSignals.length?'medium':'insufficient';
   trace.result=feasibility.status===FEASIBLE_NOW.NO?'کنار گذاشته شد':urgency.level>=4||impact.level>=4?'کاندیدای بسیار مناسب':urgency.level>=2||impact.level>=2?'کاندیدای مناسب':'کاندیدای قابل بررسی';return trace;
@@ -148,7 +150,9 @@ function chooseNextTask(tasks,date=TODAY(),nowMin=decisionNowMinutes()){
   const groups=partitionDecisionCandidates(tasks,date,nowMin);
   const pool=groups.available.length?groups.available:groups.unknown;
   const ranked=pool.map(x=>Object.assign(evaluateDecisionTask(x.task,date,nowMin),{feasibility:x.feasibility}))
-    .sort((a,b)=>b.trace.urgency.level-a.trace.urgency.level||b.trace.urgency.weight-a.trace.urgency.weight||b.trace.impact.level-a.trace.impact.level||b.trace.impact.weight-a.trace.impact.weight||b.trace.personal.score-a.trace.personal.score||b.trace.manual.level-a.trace.manual.level||((a.duration||Infinity)-(b.duration||Infinity))||(a.task.id-b.task.id));
+    .sort((a,b)=>b.trace.urgency.level-a.trace.urgency.level||b.trace.impact.level-a.trace.impact.level||Number(!!decisionMeta(b.task).explicitPriority)-Number(!!decisionMeta(a.task).explicitPriority)||b.trace.urgency.weight-a.trace.urgency.weight||b.trace.impact.weight-a.trace.impact.weight||b.trace.manual.level-a.trace.manual.level||b.trace.personal.score-a.trace.personal.score||((a.duration||Infinity)-(b.duration||Infinity))||(a.task.id-b.task.id));
+  const spoken=ranked.filter(x=>{const p=decisionMeta(x.task).explicitPriority;return p&&p.level==='high'}).sort((a,b)=>String(decisionMeta(b.task).explicitPriority.at||'').localeCompare(String(decisionMeta(a.task).explicitPriority.at||'')))[0];
+  if(spoken&&ranked[0]!==spoken&&ranked[0].trace.urgency.level<5&&ranked[0].trace.impact.level<4){ranked.splice(ranked.indexOf(spoken),1);ranked.unshift(spoken)}
   const top=ranked[0];if(!top)return null;const runner=ranked[1];let confidence='medium';
   if(top.feasibility.status===FEASIBLE_NOW.UNKNOWN||top.trace.dataQuality==='insufficient')confidence='insufficient';
   else if(!runner||top.trace.urgency.level>=runner.trace.urgency.level+2||top.trace.impact.level>=runner.trace.impact.level+2)confidence='high';

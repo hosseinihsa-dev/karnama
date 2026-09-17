@@ -20,8 +20,7 @@ function render(){
   const list=instOn(today);
   const doneN=list.filter(t=>t.done).length;
   document.body.classList.toggle('advisor-mode',S.tab===0);
-  document.getElementById('greet').textContent=S.tab===0?'کارنما':S.tab===7?'کارها':'سلام! امروز مال توست';
-  document.getElementById('sub').textContent=S.tab===0?fa(`${WD[wdIndex(today)]} ${jdate(today)}`):fa(`${list.length} کار برای امروز · ${doneN} انجام شده`);
+  const greetEl=document.getElementById('greet'),subEl=document.getElementById('sub');if(greetEl)greetEl.textContent=S.tab===0?'کارنما':S.tab===7?'کارها':'سلام! امروز مال توست';if(subEl)subEl.textContent=S.tab===0?fa(`${WD[wdIndex(today)]} ${jdate(today)}`):fa(`${list.length} کار برای امروز · ${doneN} انجام شده`);
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',+b.dataset.tab===S.tab));
   const v=document.getElementById('view');
   const pages={0:advisorHome,1:tomorrowView,2:weekView,3:monthView,4:catView,5:studyView,6:plannerPage,7:tasksView};
@@ -159,6 +158,18 @@ function decisionRejectPicker(id,key){
 
 function advisorSay(role,text){S.advisorChat=S.advisorChat||[];S.advisorChat.push({role,text,at:new Date().toISOString()});if(S.advisorChat.length>24)S.advisorChat=S.advisorChat.slice(-24)}
 function advisorNextText(){const n=chooseNextTask(advisorTaskPool(),TODAY());return n?`پیشنهاد بعدی من «${n.task.title}» است؛ ${n.reason}.`:'فعلاً کار مشخص دیگری ندارم که با اطمینان پیشنهاد بدهم.'}
+function advisorTaskReference(text,current){
+  const n=norm(text),active=S.tasks.filter(t=>!t.done);if(/(?:این|همین|این یکی|همین یکی)s*(?:کار)?/.test(n)&&current)return current;
+  const ignored=new Set(['نه','ولی','اما','به','نظرم','فکر','میکنم','می‌کنم','کار','اون','آن','این','خیلی','واقعا','واقعاً','مهم','مهمتره','مهم‌تره','اولویت','بالاتره','بالاتر','بیشتره','بیشتر','چون','رو','را']);
+  const words=n.replace(/[؟?،,.؛:!]/g,' ').split(/\s+/).map(x=>x.replace(/‌/g,'')).filter(x=>x.length>1&&!ignored.has(x));
+  let best=null,bestScore=0;for(const task of active){const hay=norm(`${task.title} ${task.note||''}`).replace(/‌/g,''),score=words.reduce((s,w)=>s+(hay.includes(w)?Math.max(2,w.length):0),0)+(words.length&&hay.includes(words.join(' '))?12:0);if(score>bestScore){best=task;bestScore=score}}
+  return bestScore>=3?best:null;
+}
+function setExplicitTaskPriority(task,text,level='high'){
+  task.p=level==='high'?0:2;task.meta=task.meta&&typeof task.meta==='object'?task.meta:{};task.meta.importance=level;task.meta.importanceReason=text;task.meta.explicitPriority={level,at:new Date().toISOString(),evidence:text,source:'explicit-chat'};
+  const context=Object.assign({version:1},taskContext(task)||extractTaskContext(task.note||task.title,{date:task.date}));context.importance=contextFact(level==='high'?'important':'low',text,'explicit-chat',1);task.meta.context=updateContextUnknown(context);save();
+}
+function advisorPriorityReply(target){const next=chooseNextTask(advisorTaskPool(),TODAY()),state=assessNowFeasibility(target,{date:TODAY()});if(next&&next.task.id===target.id)return `«${target.title}» را با اولویت بالاتر ثبت کردم و حالا پیشنهاد اصلی من همین کار است.`;if(state.status!=='available')return `اولویت «${target.title}» را بالاتر ثبت کردم؛ اما الآن پیشنهاد اصلی‌اش نکردم، چون ${state.reason}. ${advisorNextText()}`;return `اولویت «${target.title}» را بالاتر ثبت کردم. ${advisorNextText()}`}
 function advisorTaskIntent(text){
   const t=norm(text).trim();if(!t)return false;
   if(/[؟?]$/.test(t)||/^(چرا|چطور|چجوری|چی|چه |آیا|میشه|می‌شه|میتونی|می‌تونی|به نظرت|راهنمایی)/.test(t))return false;
@@ -180,6 +191,14 @@ function setChatPrerequisite(t,text){
 }
 function handleAdvisorMessage(raw){
   const text=raw.trim();if(!text)return;advisorSay('user',text);
+  const before=chooseNextTask(advisorTaskPool(),TODAY()),current=before&&before.task&&byId(before.task.id);
+  if(S.advisorPending&&S.advisorPending.kind==='priority-target'){
+    const target=advisorTaskReference(text,current);S.advisorPending=null;if(target){setExplicitTaskPriority(target,text);advisorSay('assistant',advisorPriorityReply(target))}else advisorSay('assistant','هنوز نتوانستم کار موردنظرت را پیدا کنم؛ اسمش را دقیق‌تر بگو یا از بخش «کارها» انتخابش کن.');render();return
+  }
+  if(/(?:مهم.?تر|اولویت\s*(?:بالاتر|بیشتر)|بالاترین\s*اولویت)/.test(text)){
+    const target=advisorTaskReference(text,current);if(target){setExplicitTaskPriority(target,text);advisorSay('assistant',advisorPriorityReply(target))}else{S.advisorPending={kind:'priority-target'};const names=S.tasks.filter(z=>!z.done).slice(0,3).map(z=>`«${z.title}»`).join('، ');advisorSay('assistant',`کدام کار را می‌گویی؟ اسمش را بگو${names?'؛ مثلاً '+names:''}.`)}render();return
+  }
+  if(/(?:این|همین).*(?:مهم نیست|کم.?اهمیت)|(?:مهم نیست|کم.?اهمیت).*(?:این|همین)/.test(text)&&current){setExplicitTaskPriority(current,text,'low');advisorSay('assistant',`اهمیت «${current.title}» را پایین‌تر ثبت کردم. ${advisorNextText()}`);render();return}
   if(advisorTaskIntent(text)){
     const made=addTaskFromAdvisor(text);if(made.duplicate)advisorSay('assistant',`«${made.task.title}» از قبل در کارهایت هست.`);else{const t=made.task,when=t.date===TODAY()?'امروز':t.date===addDays(TODAY(),1)?'فردا':fa(jdate(t.date));advisorSay('assistant',`فهمیدم که این یک کار است؛ «${t.title}» را برای ${when}${t.time?' ساعت '+fa(t.time):''} در «${CATS[t.c].name}» ثبت کردم.`)}render();return
   }
@@ -225,8 +244,22 @@ function bindAdvisorChat(){
   const submit=()=>{const text=input.value.trim();if(text)handleAdvisorMessage(text)};send.onclick=submit;input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit()}};
   if(plus)plus.onclick=()=>openSheet();
   document.querySelectorAll('[data-advisor-text]').forEach(b=>b.onclick=()=>handleAdvisorMessage(b.dataset.advisorText));
-  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!voice)return;if(!SpeechRecognition){voice.classList.add('unsupported');voice.disabled=true;return}
-  voice.onclick=()=>{const rec=new SpeechRecognition(),close=()=>{voice.classList.remove('listening');document.body.classList.remove('voice-listening');if(stage){stage.classList.remove('show');stage.setAttribute('aria-hidden','true')}};rec.lang='fa-IR';rec.interimResults=true;voice.classList.add('listening');document.body.classList.add('voice-listening');if(stage){stage.classList.add('show');stage.setAttribute('aria-hidden','false')}const stop=()=>{try{rec.stop()}catch(e){};close()};const closeBtn=document.getElementById('voice-close'),stopBtn=document.getElementById('voice-stop');if(closeBtn)closeBtn.onclick=stop;if(stopBtn)stopBtn.onclick=stop;rec.onresult=e=>{let text='';for(let i=e.resultIndex;i<e.results.length;i++)text+=e.results[i][0].transcript;const out=document.getElementById('voice-transcript');if(out)out.textContent=text||'دارم گوش می‌دهم...';if(e.results[e.results.length-1].isFinal&&text)handleAdvisorMessage(text)};rec.onerror=e=>{if(e.error!=='aborted')toast('صدا تشخیص داده نشد؛ می‌توانی تایپ کنی.',3000)};rec.onend=close;try{rec.start()}catch(e){close()}};
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!voice)return;
+  voice.onclick=async()=>{
+    if(!SpeechRecognition){toast('تشخیص گفتار در این مرورگر در دسترس نیست؛ کارنما را با Chrome به‌روز باز کن.',5000);return}
+    voice.disabled=true;let stream=null;
+    try{if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){stream=await navigator.mediaDevices.getUserMedia({audio:true});stream.getTracks().forEach(t=>t.stop())}}
+    catch(e){voice.disabled=false;toast('اجازه میکروفون داده نشده؛ از تنظیمات سایت، Microphone را روی Allow بگذار.',6000);return}
+    const rec=new SpeechRecognition(),out=document.getElementById('voice-transcript');let finalText='',started=false;
+    const close=()=>{voice.disabled=false;voice.classList.remove('listening');document.body.classList.remove('voice-listening');if(stage){stage.classList.remove('show');stage.setAttribute('aria-hidden','true')}};
+    rec.lang='fa-IR';rec.interimResults=true;rec.continuous=false;
+    rec.onstart=()=>{started=true;voice.classList.add('listening');document.body.classList.add('voice-listening');if(stage){stage.classList.add('show');stage.setAttribute('aria-hidden','false')}if(out)out.textContent='دارم گوش می‌دهم...'};
+    const stop=()=>{try{rec.stop()}catch(e){close()}};const closeBtn=document.getElementById('voice-close'),stopBtn=document.getElementById('voice-stop');if(closeBtn)closeBtn.onclick=stop;if(stopBtn)stopBtn.onclick=stop;
+    rec.onresult=e=>{let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const part=e.results[i][0].transcript;if(e.results[i].isFinal)finalText+=part;else interim+=part}if(out)out.textContent=finalText||interim||'دارم گوش می‌دهم...'};
+    rec.onerror=e=>{const msg=e.error==='not-allowed'||e.error==='service-not-allowed'?'اجازه میکروفون مسدود است؛ در تنظیمات Chrome برای این سایت فعالش کن.':e.error==='network'?'سرویس تشخیص گفتار Chrome به اینترنت دسترسی ندارد؛ اتصال را بررسی کن.':e.error==='audio-capture'?'میکروفون گوشی در دسترس نیست یا برنامه دیگری از آن استفاده می‌کند.':e.error==='no-speech'?'صدایی دریافت نشد؛ دوباره بزن و کمی نزدیک‌تر صحبت کن.':'تشخیص صدا شروع نشد؛ دوباره امتحان کن.';toast(msg,6000);close()};
+    rec.onend=()=>{close();if(finalText.trim())handleAdvisorMessage(finalText.trim());else if(started&&!document.querySelector('#toast.show'))toast('چیزی نشنیدم؛ دوباره امتحان کن.',3500)};
+    try{rec.start()}catch(e){close();toast('میکروفون در حال استفاده است؛ چند لحظه دیگر دوباره امتحان کن.',4500)}
+  };
 }
 
 function plannerPage(overdue,list,doneN,today){
