@@ -110,6 +110,7 @@ function decisionPanel(today){
 
 function decisionRejectPicker(id,key){
   const t=decisionCandidates(S.tasks,TODAY()).find(x=>x.id===id&&decisionKey(x)===key)||byId(id);if(!t)return;
+  pk._onDismiss=null;
   pk.classList.remove('cat-mode');pkbx.classList.remove('cat-mode');
   const reasons=[['no-time','وقت ندارم'],['no-energy','انرژی ندارم'],['blocked','شرایطش فراهم نیست'],['other','دلیل دیگر']];
   pkbx.innerHTML=`<h4>چرا الان نمی‌تونی؟</h4><div class="decision-reject-note">این بازخورد فقط برای بهترشدن پیشنهادهای بعدی روی همین دستگاه ذخیره می‌شود.</div>`+
@@ -364,8 +365,9 @@ if(mic){
 
 /* --- picker --- */
 const pk=document.getElementById('pick'),pkbx=pk.querySelector('.bx');
-pk.querySelector('.bd').onclick=()=>pk.classList.remove('show');
+pk.querySelector('.bd').onclick=()=>{if(typeof pk._onDismiss==='function')pk._onDismiss();pk._onDismiss=null;pk.classList.remove('show')};
 function picker(f){
+  pk._onDismiss=null;
   const g=S.pv,today=TODAY();
   pk.classList.toggle('cat-mode',f==='c');
   pkbx.classList.toggle('cat-mode',f==='c');
@@ -465,6 +467,7 @@ function calPicker(f){
 
 /* --- how much did you read? (in-app, instead of prompt) --- */
 function amountPicker(id){
+  pk._onDismiss=null;
   const p=studyById(id);if(!p)return;
   const max=studyRemaining(p);if(!max)return;
   const st=studyStats(p),unit=p.mode==='page'?'صفحه':'فصل';
@@ -482,6 +485,22 @@ function amountPicker(id){
   pk.classList.add('show');
 }
 
+function clarificationPicker(t,q,entry){
+  if(!t||!q||!entry)return;
+  const dismiss=()=>{if(skipClarification(t,entry.id)){save();toast('کار ثبت شد؛ فعلاً بدون پاسخ ادامه می‌دهیم.',2600)}};
+  pk.classList.remove('cat-mode');pkbx.classList.remove('cat-mode');pk._onDismiss=dismiss;
+  pkbx.innerHTML=`<div class="clarify-kicker">یک سؤال کوتاه و اختیاری</div><h4>${esc(q.question)}</h4><div class="clarify-note">کار همین حالا ثبت شده؛ پاسخ فقط کمک می‌کند پیشنهادهای همین کار دقیق‌تر شوند.</div>
+    <textarea id="clarify-answer" rows="3" placeholder="${esc(q.placeholder||'پاسخت را کوتاه بنویس')}"></textarea>
+    <div class="clarify-actions"><button data-clarify-skip="1">فعلاً نه</button><button data-clarify-save="1">ثبت پاسخ</button></div>`;
+  const input=pkbx.querySelector('#clarify-answer');
+  pkbx.querySelector('[data-clarify-skip]').onclick=()=>{pk._onDismiss=null;dismiss();pk.classList.remove('show')};
+  pkbx.querySelector('[data-clarify-save]').onclick=()=>{
+    if(!input.value.trim()){toast('یک پاسخ کوتاه بنویس یا «فعلاً نه» را بزن.',2600);input.focus();return}
+    if(answerClarification(t,entry.id,input.value)){save();pk._onDismiss=null;pk.classList.remove('show');render();toast('پاسخ به زمینه همین کار اضافه شد.',2800)}
+  };
+  pk.classList.add('show');setTimeout(()=>input.focus(),80);
+}
+
 sb.onclick=()=>{
   const txt=dr.value.trim();if(!txt)return;
   const g=S.pv||Object.assign({titleManual:false},classify(txt));
@@ -494,15 +513,18 @@ sb.onclick=()=>{
     const changes={title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,meta:Object.assign({},t&&t.meta||{},g.meta||{},analyzed.meta||{})};
     if(duplicateOf(changes,S.edit)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
     if(t)Object.assign(t,changes);
+    const question=t?detectImportantAmbiguity(t):null,entry=t&&question?registerClarificationQuestion(t,question):null;
     save();closeSheet();S.day=g.date;S.pv=null;S.edit=null;dr.value='';render();
-    toast('تغییرات ذخیره شد.',2600);
+    if(entry)setTimeout(()=>clarificationPicker(t,question,entry),80);else toast('تغییرات ذخیره شد.',2600);
     return;
   }
   const newTask={id:Date.now(),title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0,meta:Object.assign({},g.meta||{},analyzed.meta||{})};
   if(duplicateOf(newTask)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
   S.tasks.push(newTask);
+  const question=detectImportantAmbiguity(newTask),entry=question?registerClarificationQuestion(newTask,question):null;
   save();closeSheet();S.tab=g.date===addDays(today,1)?1:0;S.day=g.date;S.pv=null;dr.value='';render();
-  toast(`اضافه شد به «${CATS[g.c].name}»${g.rep?' · '+repLabel(g)+(g.until?' تا '+fa(jdate(g.until)):''):''} · پیشنهاد: ${dl} ${g.time?fa(g.time):SLOTS[g.s]}`);
+  if(entry)setTimeout(()=>clarificationPicker(newTask,question,entry),80);
+  else toast(`اضافه شد به «${CATS[g.c].name}»${g.rep?' · '+repLabel(g)+(g.until?' تا '+fa(jdate(g.until)):''):''} · پیشنهاد: ${dl} ${g.time?fa(g.time):SLOTS[g.s]}`);
 };
 
 document.getElementById('sh-del').onclick=()=>{

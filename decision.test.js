@@ -1,7 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const mem={};
 global.localStorage={getItem:k=>mem[k]||null,setItem:(k,v)=>{mem[k]=String(v)}};
-const source=fs.readFileSync('core.js','utf8')+'\n'+fs.readFileSync('decision.js','utf8')+`\n;globalThis.api={TODAY,addDays,classify,extractTaskContext,titleFrom,contextPrioritySignals,decisionNowMinutes,assessNowFeasibility,partitionDecisionCandidates,decisionCandidates,evaluateDecisionTask,chooseNextTask,recordDecisionEvent,restoreDecision,setTasks:x=>S.tasks=x,getDecision:()=>DECISION,reset:()=>{DECISION={feedback:[],history:[],context:{}}}};`;
+const source=fs.readFileSync('core.js','utf8')+'\n'+fs.readFileSync('decision.js','utf8')+'\n'+fs.readFileSync('clarify.js','utf8')+`\n;globalThis.api={TODAY,addDays,classify,extractTaskContext,titleFrom,contextPrioritySignals,detectImportantAmbiguity,registerClarificationQuestion,answerClarification,skipClarification,decisionNowMinutes,assessNowFeasibility,partitionDecisionCandidates,decisionCandidates,evaluateDecisionTask,chooseNextTask,recordDecisionEvent,restoreDecision,setTasks:x=>S.tasks=x,getDecision:()=>DECISION,reset:()=>{DECISION={feedback:[],history:[],context:{}}}};`;
 vm.runInThisContext(source,{filename:'decision-bundle.js'});
 const A=global.api,D=A.TODAY();let id=100;
 const task=(x={})=>Object.assign({id:id++,title:'کار آزمایشی',note:'',c:12,p:1,s:1,date:D,done:false,rep:null,time:null},x);
@@ -56,4 +56,15 @@ assert.doesNotThrow(()=>A.evaluateDecisionTask(legacy,D,12*60),'۴۷: کار ق�
 let backed=JSON.parse(JSON.stringify({tasks:[contextual]}));assert.equal(backed.tasks[0].meta.context.commitment.evidence,customer.commitment.evidence,'۴۸: Context در JSON پشتیبان حفظ شود');
 let explained=A.evaluateDecisionTask(contextual,D,12*60).reason;assert.ok(explained.includes('فردا')&&explained.includes('وابسته'),'۴۹: دلیل پیشنهاد به داده واقعی تکیه کند');
 
-console.log('۴۹ سناریوی تصمیم، Context، امکان‌پذیری و مهاجرت با موفقیت گذشت.');
+let bread=task({title:'خرید نان',note:'خرید نان',c:3,meta:A.classify('خرید نان').meta});assert.equal(A.detectImportantAmbiguity(bread),null,'۵۰: کار ساده سؤال غیرضروری نگیرد');
+let vagueDesign=task({title:'انجام طرح سایت',note:'طرح سایت رو انجام بدم',c:4,meta:A.classify('طرح سایت رو انجام بدم').meta}),dq=A.detectImportantAmbiguity(vagueDesign);assert.equal(dq.type,'deadline','۵۱: ابهام تعیین‌کننده طرح به سؤال مهلت تبدیل شود');
+let talk=task({title:'صحبت با علی درباره پروژه',note:'با علی درباره پروژه صحبت کنم',c:0,meta:A.classify('با علی درباره پروژه صحبت کنم').meta}),tq=A.detectImportantAmbiguity(talk);assert.equal(tq.type,'timing','۵۲: گفت‌وگوی مبهم فقط سؤال زمان بگیرد');
+assert.equal(A.detectImportantAmbiguity(contextual),null,'۵۳: کار دارای ددلاین و وابستگی سؤال تکمیلی نگیرد');
+let dEntry=A.registerClarificationQuestion(vagueDesign,dq);assert.ok(dEntry&&vagueDesign.clarification.history.length===1,'۵۴: فقط یک سؤال در سابقه ثبت شود');assert.equal(A.detectImportantAmbiguity(vagueDesign),null,'۵۵: همان سؤال دوباره مطرح نشود');
+let answerDate=A.addDays(D,1);assert.ok(A.answerClarification(vagueDesign,dEntry.id,'تا فردا'),'۵۶: پاسخ اختیاری به کار متصل شود');assert.equal(vagueDesign.meta.context.deadline.value,answerDate,'۵۷: پاسخ ددلاین Context را به‌روزرسانی کند');assert.equal(vagueDesign.meta.context.deadline.source,'explicit-answer','۵۸: پاسخ صریح از استنباط تفکیک شود');
+let talkEntry=A.registerClarificationQuestion(talk,tq);assert.ok(A.skipClarification(talk,talkEntry.id),'۵۹: گزینه فعلاً نه سؤال را رد کند');assert.equal(talk.clarification.history[0].status,'skipped','۶۰: رد سؤال ذخیره شود');assert.equal(A.detectImportantAmbiguity(talk),null,'۶۱: سؤال ردشده بی‌دلیل تکرار نشود');
+let noAnswer=task({title:'طرح تازه',note:'طرح تازه پروژه را انجام بدم',c:4,meta:A.classify('طرح تازه پروژه را انجام بدم').meta}),nq=A.detectImportantAmbiguity(noAnswer),ne=A.registerClarificationQuestion(noAnswer,nq);assert.ok(ne&&noAnswer.title==='طرح تازه','۶۲: سؤال مانع ثبت یا تغییر کار نشود');
+let oldClarify=task({title:'کار قدیمی',note:'کار قدیمی'});delete oldClarify.clarification;assert.doesNotThrow(()=>A.detectImportantAmbiguity(oldClarify),'۶۳: نبود تاریخچه در داده قدیمی امن باشد');
+let clarifyBackup=JSON.parse(JSON.stringify({tasks:[vagueDesign,talk]}));assert.equal(clarifyBackup.tasks[0].clarification.history[0].status,'answered','۶۴: پاسخ در JSON پشتیبان حفظ شود');assert.equal(clarifyBackup.tasks[1].clarification.history[0].status,'skipped','۶۵: رد سؤال در JSON پشتیبان حفظ شود');
+
+console.log('۶۵ سناریوی تصمیم، Context، سؤال تکمیلی و مهاجرت با موفقیت گذشت.');

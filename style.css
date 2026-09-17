@@ -204,6 +204,7 @@ nav button.on span{color:#C9A227}
 #pick .bx h4{margin:0 0 4px;font:700 13px inherit;color:#F2F0EB}
 #pick .op{padding:11px 13px;border-radius:13px;background:#1b1d23;font:500 13px inherit;color:#D9D6CF;text-align:right;display:flex;align-items:center;gap:8px}
 #pick .op.on{background:rgba(201,162,39,.14);color:#C9A227}
+.clarify-kicker{font:700 10px inherit;color:#c9a227}.clarify-note{font:400 10.5px/1.7 inherit;color:#858891;margin:-2px 0 3px}.clarify-note+textarea{width:100%;min-height:76px;resize:none;border-radius:13px;border:1px solid #30323a;background:#1b1d23;color:#eeece7;padding:10px 11px;font:500 12.5px/1.7 inherit;outline:none;direction:rtl}.clarify-note+textarea:focus{border-color:#c9a227}.clarify-actions{display:grid;grid-template-columns:1fr 1.3fr;gap:8px;margin-top:3px}.clarify-actions button{min-height:46px;border-radius:13px;font:700 12px inherit}.clarify-actions button:first-child{background:#25272e;color:#a7a9af}.clarify-actions button:last-child{background:#c9a227;color:#151107}
 .cat-mode#pick{padding:12px}
 #pick .bx.cat-mode{max-width:410px;max-height:88dvh;padding:18px}
 .cat-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;direction:rtl}
