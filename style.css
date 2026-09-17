@@ -267,3 +267,33 @@ nav button.on span{color:#C9A227}
 
 @keyframes ka-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes ka-up{from{transform:translateY(100%)}to{transform:none}}
+
+/* ---------- immersive coach v54 ---------- */
+body.advisor-mode{background:#0c0e0d}
+body.advisor-mode:before{content:"";position:fixed;inset:0 0 auto;height:48vh;background:radial-gradient(circle at 18% 0,rgba(193,229,43,.28),transparent 42%),radial-gradient(circle at 75% 4%,rgba(61,106,22,.25),transparent 38%);filter:blur(18px);pointer-events:none}
+body.advisor-mode header{position:relative;z-index:2;align-items:center;padding-bottom:4px}
+body.advisor-mode header>div{position:absolute;left:50%;transform:translateX(-50%);text-align:center;white-space:nowrap}
+body.advisor-mode #greet{font-size:13px;font-weight:600}
+body.advisor-mode #sub{display:none}
+body.advisor-mode #menu-btn{order:-1;border-radius:50%;background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.12)}
+body.advisor-mode #menu-btn svg{stroke:#d8dad5}
+body.advisor-mode main{padding:0 18px 178px;position:relative;z-index:1}
+.coach-home{min-height:calc(100dvh - 190px);display:flex;flex-direction:column;align-items:center;position:relative;padding-top:22px}
+.coach-glow{position:absolute;top:-92px;width:320px;height:250px;border-radius:50%;background:radial-gradient(circle,rgba(179,238,38,.19),transparent 65%);filter:blur(8px);pointer-events:none}
+.coach-orb{width:74px;height:74px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 32% 28%,#efffb7 0,#d3f069 22%,#b5da32 44%,#47650d 72%,#111708 100%);box-shadow:0 0 32px rgba(186,235,45,.27),inset 0 -8px 18px rgba(0,0,0,.28);position:relative}
+.coach-orb svg{width:42px;height:42px;fill:#111708}
+.coach-question{text-align:center;margin:22px 0 18px;font:750 24px/1.55 inherit;letter-spacing:-.45px;color:#f4f5f0}
+.coach-hints{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;max-width:340px}
+.coach-hints button{min-height:42px;padding:9px 14px;border-radius:99px;background:rgba(38,41,39,.92);border:1px solid #414541;color:#d8dad5;font:550 11px inherit;transition:border-color .18s,background .18s}
+.coach-hints button:active,.coach-hints button:focus-visible{border-color:#b9e633;background:#29301e;outline:none}
+.advisor-proposal{width:100%;max-width:460px;margin-top:22px;padding:15px 16px;border-radius:20px;background:linear-gradient(135deg,rgba(53,61,39,.78),rgba(24,27,25,.95));border:1px solid rgba(187,230,51,.25);box-shadow:0 15px 38px rgba(0,0,0,.22)}
+.advisor-proposal>span{font:700 9px inherit;color:#b9e633}.advisor-proposal h2{margin:5px 0 4px;font:750 16px/1.55 inherit;color:#f2f3ed}.advisor-proposal p{margin:0;color:#9fa49d;font:450 10.5px/1.65 inherit}.advisor-proposal>div{display:flex;gap:8px;margin-top:11px}.advisor-proposal button{flex:1;min-height:42px;border-radius:13px;background:#292d2a;color:#c4c7c1;font:650 10.5px inherit}.advisor-proposal button.primary{background:#b9e633;color:#101408}.advisor-proposal.empty{text-align:center}
+.coach-home>.advisor-messages{width:100%;max-width:460px;margin:14px 0 0;max-height:none;overflow:visible}.coach-home .advisor-msg{font-size:11.5px}.coach-home .advisor-msg.user{background:#30352e;color:#e8ebe4}.coach-home .advisor-msg.assistant{background:rgba(185,230,51,.11);border:1px solid rgba(185,230,51,.16);color:#d7ddce}
+.coach-compose{position:fixed;z-index:12;right:16px;left:16px;bottom:calc(82px + env(safe-area-inset-bottom));height:58px;padding:6px;display:flex;align-items:center;gap:6px;border-radius:22px;background:rgba(31,34,32,.96);border:1px solid #424642;box-shadow:0 14px 38px rgba(0,0,0,.5);backdrop-filter:blur(18px)}
+.coach-compose textarea{flex:1;min-width:0;max-height:44px;resize:none;border:0;background:transparent;color:#f0f2ed;padding:11px 7px;font:500 12px/1.65 inherit;outline:0}.coach-compose textarea::placeholder{color:#848984}
+.coach-compose button{width:44px;height:44px;flex:none;border-radius:50%;display:grid;place-items:center}.coach-plus{background:#292d2a;color:#b8bcb6;font:300 25px/1 inherit;border:1px solid #444944}.coach-compose #advisor-send{display:none;background:#b9e633;color:#101408}.coach-compose #advisor-send svg,.coach-compose #advisor-voice svg{width:20px;height:20px;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.coach-compose #advisor-voice{background:#b9e633;color:#101408}.coach-compose:focus-within #advisor-send{display:grid}.coach-compose:focus-within #advisor-voice{display:none}
+.voice-stage{position:fixed;z-index:100;inset:0;display:flex;flex-direction:column;align-items:center;background:#090b0a;opacity:0;visibility:hidden;transition:opacity .22s;overflow:hidden}.voice-stage.show{opacity:1;visibility:visible}.voice-stage-glow{position:absolute;inset:-15% -25% auto;height:65%;background:radial-gradient(circle at 70% 15%,rgba(134,214,31,.42),transparent 50%);filter:blur(22px)}
+.voice-stage>span{position:relative;margin-top:calc(54px + env(safe-area-inset-top));font:600 12px inherit;color:#d7dad4}.voice-stage #voice-close{position:absolute;top:calc(24px + env(safe-area-inset-top));right:20px;width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);font-size:24px;color:#dfe2dc}.voice-orb{position:relative;margin-top:54px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 35% 28%,#fff 0,#ecffd3 30%,#9dffc3 64%,#52d7ad 82%,#1a5137 100%);box-shadow:0 0 55px rgba(126,255,151,.24);animation:voice-pulse 1.8s ease-in-out infinite}.voice-stage p{position:relative;max-width:330px;margin:40px 28px 0;text-align:center;font:650 20px/1.65 inherit;color:#f2f4ef}.voice-stage #voice-stop{position:absolute;bottom:calc(42px + env(safe-area-inset-bottom));width:72px;height:72px;border-radius:50%;background:#5df579;color:#071309;box-shadow:0 0 0 12px rgba(93,245,121,.08);display:grid;place-items:center}.voice-stage #voice-stop svg{width:27px;height:27px;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+body.voice-listening>header,body.voice-listening>nav{visibility:hidden}
+@keyframes voice-pulse{50%{transform:scale(1.055);filter:saturate(1.18)}}
+@media(min-width:700px){.coach-compose{left:50%;right:auto;width:min(560px,calc(100% - 32px));transform:translateX(-50%)}.coach-home{padding-top:38px}.coach-question{font-size:28px}}

@@ -19,7 +19,8 @@ function render(){
   const overdue=S.tasks.filter(t=>!t.rep&&!t.done&&t.date<today).sort(bySlot);
   const list=instOn(today);
   const doneN=list.filter(t=>t.done).length;
-  document.getElementById('greet').textContent=S.tab===0?'سلام؛ بیا فقط قدم بعدی را پیدا کنیم':S.tab===7?'کارها':'سلام! امروز مال توست';
+  document.body.classList.toggle('advisor-mode',S.tab===0);
+  document.getElementById('greet').textContent=S.tab===0?'کارنما':S.tab===7?'کارها':'سلام! امروز مال توست';
   document.getElementById('sub').textContent=S.tab===0?fa(`${WD[wdIndex(today)]} ${jdate(today)}`):fa(`${list.length} کار برای امروز · ${doneN} انجام شده`);
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',+b.dataset.tab===S.tab));
   const v=document.getElementById('view');
@@ -64,10 +65,9 @@ function render(){
 
 function advisorHome(overdue,list,doneN,today){
   const x=chooseNextTask(advisorTaskPool(today),today),chat=(S.advisorChat||[]).slice(-6);
-  let h=`<div class="advisor-intro"><span>همین الآن</span><h2>قرار نیست همه‌چیز را با هم حل کنی.</h2><p>فقط یک قدم قابل‌دفاع انتخاب می‌کنیم؛ تصمیم آخر با توست.</p></div>`;
-  h+=decisionPanel(today,x,true);
-  h+=`<section class="advisor-chat"><div class="advisor-chat-head"><b>با کارنما درباره همین پیشنهاد حرف بزن</b><span>کوتاه و اجرایی</span></div>${chat.length?`<div class="advisor-messages">${chat.map(m=>`<div class="advisor-msg ${m.role}">${esc(m.text)}</div>`).join('')}</div>`:''}<div class="advisor-compose"><textarea id="advisor-input" rows="2" placeholder="مثلاً: یه کار سبک‌تر بهم بده"></textarea><button id="advisor-voice" aria-label="گفت‌وگوی صوتی با کارنما"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4m7-4a7 7 0 0 1-14 0m7 7v4m-4 0h8"/></svg></button><button id="advisor-send">بفرست</button></div><div class="advisor-hints"><button data-advisor-text="چرا این کار؟">چرا این؟</button><button data-advisor-text="یه کار سبک‌تر بده">کار سبک‌تر</button><button data-advisor-text="این رو بذار برای فردا">بذار فردا</button></div></section>`;
-  return h;
+  if(x)recordSuggestedBehavior(x.task,x);
+  const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2><p>${esc(x.reason)}</p><div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionStart" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">شروع می‌کنم</button></div></div>`:`<div class="advisor-proposal empty"><h2>فعلاً پیشنهاد مشخصی ندارم</h2><p>هر کاری توی ذهنت هست بنویس یا بگو.</p></div>`;
+  return `<section class="coach-home"><div class="coach-glow"></div><div class="coach-orb"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 7c6 0 10 3 13 8 3-5 7-8 13-8v7c-6 0-9 4-9 10v10h-8V24c0-6-3-10-9-10z"/></svg></div><h2 class="coach-question">الان دوست داری<br>روی چی تمرکز کنیم؟</h2><div class="coach-hints"><button data-advisor-text="الان چیکار کنم؟">الان چیکار کنم؟</button><button data-advisor-text="یه کار سبک‌تر بده">یک کار سبک‌تر</button><button data-advisor-text="کارهای امروز رو بگو">کارهای امروز</button></div>${proposal}${chat.length?`<div class="advisor-messages">${chat.map(m=>`<div class="advisor-msg ${m.role}">${esc(m.text)}</div>`).join('')}</div>`:''}<div class="coach-compose"><button class="coach-plus" id="coach-plus" aria-label="افزودن کار با جزئیات">+</button><textarea id="advisor-input" rows="1" aria-label="پیام به کارنما" placeholder="هرچی توی ذهنته بنویس..."></textarea><button id="advisor-send" aria-label="فرستادن پیام"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button><button id="advisor-voice" aria-label="گفت‌وگوی صوتی با کارنما"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4m7-4a7 7 0 0 1-14 0m7 7v4m-4 0h8"/></svg></button></div></section><div id="voice-stage" class="voice-stage" aria-hidden="true"><div class="voice-stage-glow"></div><button id="voice-close" aria-label="بستن شنیدن صدا">×</button><span>کارنما گوش می‌دهد...</span><div class="voice-orb"></div><p id="voice-transcript">صحبت کن؛ اگر کار باشد خودکار ثبتش می‌کنم.</p><button id="voice-stop" aria-label="پایان ضبط"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4m7-4a7 7 0 0 1-14 0m7 7v4"/></svg></button></div>`;
 }
 
 function tasksView(overdue,list,doneN,today){
@@ -159,12 +159,33 @@ function decisionRejectPicker(id,key){
 
 function advisorSay(role,text){S.advisorChat=S.advisorChat||[];S.advisorChat.push({role,text,at:new Date().toISOString()});if(S.advisorChat.length>24)S.advisorChat=S.advisorChat.slice(-24)}
 function advisorNextText(){const n=chooseNextTask(advisorTaskPool(),TODAY());return n?`پیشنهاد بعدی من «${n.task.title}» است؛ ${n.reason}.`:'فعلاً کار مشخص دیگری ندارم که با اطمینان پیشنهاد بدهم.'}
+function advisorTaskIntent(text){
+  const t=norm(text).trim();if(!t)return false;
+  if(/[؟?]$/.test(t)||/^(چرا|چطور|چجوری|چی|چه |آیا|میشه|می‌شه|میتونی|می‌تونی|به نظرت|راهنمایی)/.test(t))return false;
+  if(/^(سلام|خوبی|مرسی|ممنون|باشه|اوکی|نه|بله|آره)$/.test(t))return false;
+  if(/چرا این|سبک.?تر|الان نمی.?تونم|بذار.*فردا|مهم نیست|انجامش دادم|انجام شد|تموم شد|چه کار/.test(t))return false;
+  const action=/(?:باید|یادم بنداز|یادآوری|قرار دارم|جلسه دارم|وقت دارم|می.?خوام).+|(?:کنم|بکنم|بدم|بدهم|بگیرم|برم|بیام|بخرم|بخونم|بخوانم|ببینم|بنویسم|بفرستم|پرداخت کنم|تماس بگیرم|زنگ بزنم|رزرو کنم|تحویل بدم|تمام کنم)(?:\s|$)/;
+  const schedule=/(امروز|فردا|پس.?فردا|امشب|صبح|ظهر|عصر|شب|شنبه|یک.?شنبه|دوشنبه|سه.?شنبه|چهار.?شنبه|پنج.?شنبه|جمعه|ساعت\s*[\d۰-۹]+)/;
+  return action.test(t)||(schedule.test(t)&&/(جلسه|قرار|کلاس|دکتر|خرید|تماس|تحویل|ارسال|پرداخت|قبض|کتاب|مطالعه)/.test(t));
+}
+function addTaskFromAdvisor(text){
+  const g=Object.assign({titleManual:false},classify(text)),title=titleFrom(text)||text.trim();if(g.c===11&&!/(ایده|فکر|شاید|یادداشت)/.test(text))g.c=12;
+  const task={id:Date.now(),title,note:text.trim(),c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0,meta:Object.assign({},g.meta||{})};
+  if(duplicateOf(task))return {duplicate:true,task};
+  S.tasks.push(task);const question=detectImportantAmbiguity(task),entry=question?registerClarificationQuestion(task,question):null;save();return {task,question,entry};
+}
 function setChatPrerequisite(t,text){
   const base=byId(t.id);if(!base)return;const m=text.match(/(?:بدون|اول\s+باید)\s+(.+?)(?:\s+(?:نمی|نمیشه|نمی‌شه|انجام|باشه|بشه)|$)/),value=(m&&m[1]||text).trim();
   base.meta=base.meta&&typeof base.meta==='object'?base.meta:{};const context=Object.assign({version:1},taskContext(base)||extractTaskContext(base.note||base.title,{date:base.date}));context.prerequisite=contextFact(value,text,'explicit-chat',1);base.meta.context=updateContextUnknown(context);save();
 }
 function handleAdvisorMessage(raw){
-  const text=raw.trim();if(!text)return;advisorSay('user',text);const x=chooseNextTask(advisorTaskPool(),TODAY()),t=x&&x.task,base=t&&byId(t.id);if(!t){advisorSay('assistant','فعلاً پیشنهادی ندارم؛ می‌توانی از بخش «کارها» چیزی اضافه یا اصلاح کنی.');render();return}
+  const text=raw.trim();if(!text)return;advisorSay('user',text);
+  if(advisorTaskIntent(text)){
+    const made=addTaskFromAdvisor(text);if(made.duplicate)advisorSay('assistant',`«${made.task.title}» از قبل در کارهایت هست.`);else{const t=made.task,when=t.date===TODAY()?'امروز':t.date===addDays(TODAY(),1)?'فردا':fa(jdate(t.date));advisorSay('assistant',`فهمیدم که این یک کار است؛ «${t.title}» را برای ${when}${t.time?' ساعت '+fa(t.time):''} در «${CATS[t.c].name}» ثبت کردم.`)}render();return
+  }
+  const x=chooseNextTask(advisorTaskPool(),TODAY()),t=x&&x.task,base=t&&byId(t.id);if(!t){advisorSay('assistant','فعلاً پیشنهادی ندارم؛ اگر کاری در ذهنت هست طبیعی بنویس تا ثبتش کنم.');render();return}
+  if(/کارهای امروز|کارای امروز/.test(text)){const items=instOn(TODAY()).filter(z=>!z.done).slice(0,5);advisorSay('assistant',items.length?`امروز ${fa(items.length)} کار اولت این‌هاست: ${items.map(z=>`«${z.title}»`).join('، ')}${instOn(TODAY()).filter(z=>!z.done).length>5?' و چند کار دیگر.':'.'}`:'برای امروز کار انجام‌نشده‌ای نداری.');render();return}
+  if(/الان چیکار|چه کار.*انجام/.test(text)){advisorSay('assistant',`پیشنهاد من «${t.title}» است؛ ${x.reason}.`);render();return}
   if(t.meta&&t.meta.advisorStudy){
     if(/چرا|دلیل/.test(text))advisorSay('assistant',`دلیل پیشنهادم اینه که ${x.reason}.`);
     else if(/انجامش دادم|انجام شد|خوندم|خواندم/.test(text)){const p=studyById(t.meta.studyId),st=p&&studyStats(p);if(p&&st.target)addStudyProgress(p.id,st.target);advisorSay('assistant',`مطالعه امروز ثبت شد. ${advisorNextText()}`)}
@@ -200,11 +221,12 @@ function handleAdvisorMessage(raw){
   advisorSay('assistant','می‌توانم دلیل پیشنهاد را توضیح بدهم، مانع یا پیش‌نیاز ثبت کنم، کار را به فردا ببرم یا گزینه سبک‌تری پیشنهاد بدهم.');render();
 }
 function bindAdvisorChat(){
-  const input=document.getElementById('advisor-input'),send=document.getElementById('advisor-send'),voice=document.getElementById('advisor-voice');if(!input||!send)return;
+  const input=document.getElementById('advisor-input'),send=document.getElementById('advisor-send'),voice=document.getElementById('advisor-voice'),plus=document.getElementById('coach-plus'),stage=document.getElementById('voice-stage');if(!input||!send)return;
   const submit=()=>{const text=input.value.trim();if(text)handleAdvisorMessage(text)};send.onclick=submit;input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit()}};
+  if(plus)plus.onclick=()=>openSheet();
   document.querySelectorAll('[data-advisor-text]').forEach(b=>b.onclick=()=>handleAdvisorMessage(b.dataset.advisorText));
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!voice)return;if(!SpeechRecognition){voice.classList.add('unsupported');voice.disabled=true;return}
-  voice.onclick=()=>{const rec=new SpeechRecognition();rec.lang='fa-IR';rec.interimResults=false;voice.classList.add('listening');rec.onresult=e=>{const text=e.results&&e.results[0]&&e.results[0][0]&&e.results[0][0].transcript;if(text)handleAdvisorMessage(text)};rec.onerror=e=>{if(e.error!=='aborted')toast('صدا تشخیص داده نشد؛ می‌توانی تایپ کنی.',3000)};rec.onend=()=>voice.classList.remove('listening');try{rec.start()}catch(e){voice.classList.remove('listening')}};
+  voice.onclick=()=>{const rec=new SpeechRecognition(),close=()=>{voice.classList.remove('listening');document.body.classList.remove('voice-listening');if(stage){stage.classList.remove('show');stage.setAttribute('aria-hidden','true')}};rec.lang='fa-IR';rec.interimResults=true;voice.classList.add('listening');document.body.classList.add('voice-listening');if(stage){stage.classList.add('show');stage.setAttribute('aria-hidden','false')}const stop=()=>{try{rec.stop()}catch(e){};close()};const closeBtn=document.getElementById('voice-close'),stopBtn=document.getElementById('voice-stop');if(closeBtn)closeBtn.onclick=stop;if(stopBtn)stopBtn.onclick=stop;rec.onresult=e=>{let text='';for(let i=e.resultIndex;i<e.results.length;i++)text+=e.results[i][0].transcript;const out=document.getElementById('voice-transcript');if(out)out.textContent=text||'دارم گوش می‌دهم...';if(e.results[e.results.length-1].isFinal&&text)handleAdvisorMessage(text)};rec.onerror=e=>{if(e.error!=='aborted')toast('صدا تشخیص داده نشد؛ می‌توانی تایپ کنی.',3000)};rec.onend=close;try{rec.start()}catch(e){close()}};
 }
 
 function plannerPage(overdue,list,doneN,today){
