@@ -664,6 +664,10 @@ function closeMenu(){sideMenu.classList.remove('show');sideMenu.setAttribute('ar
 menuBtn.onclick=openMenu;
 document.getElementById('menu-close').onclick=closeMenu;
 sideMenu.querySelector('.side-scrim').onclick=closeMenu;
+document.getElementById('menu-advisor').onclick=()=>{S.tab=0;closeMenu();render()};
+document.getElementById('menu-tasks').onclick=()=>{S.tab=7;S.taskMode=S.taskMode||'today';closeMenu();render()};
+document.getElementById('menu-new-task').onclick=()=>{closeMenu();openSheet()};
+document.getElementById('menu-study').onclick=()=>{S.tab=5;closeMenu();render()};
 document.getElementById('menu-categories').onclick=()=>{S.tab=4;S.cat=null;closeMenu();render()};
 document.getElementById('menu-week').onclick=()=>{S.tab=7;S.taskMode='dates';S.day=TODAY();S.month=TODAY();closeMenu();render()};
 document.getElementById('menu-planner').onclick=()=>{S.tab=6;S.planPreview=true;closeMenu();render()};

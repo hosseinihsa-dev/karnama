@@ -297,3 +297,11 @@ body.advisor-mode main{padding:0 18px 178px;position:relative;z-index:1}
 body.voice-listening>header,body.voice-listening>nav{visibility:hidden}
 @keyframes voice-pulse{50%{transform:scale(1.055);filter:saturate(1.18)}}
 @media(min-width:700px){.coach-compose{left:50%;right:auto;width:min(560px,calc(100% - 32px));transform:translateX(-50%)}.coach-home{padding-top:38px}.coach-question{font-size:28px}}
+
+/* primary navigation lives in the hamburger menu */
+body>nav{display:none!important}
+main{padding-bottom:38px}
+body.advisor-mode main{padding-bottom:104px}
+.coach-compose{bottom:calc(18px + env(safe-area-inset-bottom))}
+.side-link-accent{border-color:rgba(201,162,39,.38)!important;background:rgba(201,162,39,.09)!important}.side-link-accent b,.side-link-accent svg{color:#e8c551!important}
+#toast{bottom:calc(88px + env(safe-area-inset-bottom))}
