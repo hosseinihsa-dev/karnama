@@ -1,7 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const mem={};
 global.localStorage={getItem:k=>mem[k]||null,setItem:(k,v)=>{mem[k]=String(v)}};
-const source=fs.readFileSync('core.js','utf8')+'\n'+fs.readFileSync('decision.js','utf8')+`\n;globalThis.api={TODAY,addDays,classify,titleFrom,decisionCandidates,evaluateDecisionTask,chooseNextTask,recordDecisionEvent,restoreDecision,setTasks:x=>S.tasks=x,getDecision:()=>DECISION,reset:()=>{DECISION={feedback:[],history:[],context:{}}}};`;
+const source=fs.readFileSync('core.js','utf8')+'\n'+fs.readFileSync('decision.js','utf8')+`\n;globalThis.api={TODAY,addDays,classify,titleFrom,decisionNowMinutes,assessNowFeasibility,partitionDecisionCandidates,decisionCandidates,evaluateDecisionTask,chooseNextTask,recordDecisionEvent,restoreDecision,setTasks:x=>S.tasks=x,getDecision:()=>DECISION,reset:()=>{DECISION={feedback:[],history:[],context:{}}}};`;
 vm.runInThisContext(source,{filename:'decision-bundle.js'});
 const A=global.api,D=A.TODAY();let id=100;
 const task=(x={})=>Object.assign({id:id++,title:'کار آزمایشی',note:'',c:12,p:1,s:1,date:D,done:false,rep:null,time:null},x);
@@ -25,15 +25,25 @@ A.reset();let first=task({title:'گزینه اول',p:0}),second=task({title:'گ
 A.reset();let repeated=task({title:'دارو',rep:'هر چند ساعت',every:8,time:'08:00',date:A.addDays(D,-1)});let doses=A.decisionCandidates([repeated],D,17*60);assert.ok(doses.some(x=>x.time==='00:00')&&doses.some(x=>x.time==='08:00')&&doses.some(x=>x.time==='16:00')&&!doses.some(x=>x.time==='23:00'),'۱۴: فقط نوبت‌های رسیده چندساعته نمایش داده شوند');
 let reason=A.evaluateDecisionTask(late,D,10*60).reason;assert.ok(reason.includes('عقب افتاده')&&reason.includes('اولویت'),'۱۵: دلیل قابل فهم ساخته شود');
 
-let shop=task({title:'رفتن به فروشگاه',note:'امشب حتماً به فروشگاه بروم',c:3,p:0}),report=task({title:'نوشتن گزارش',note:'گزارش پروژه را بنویسم',c:4,p:1}),study=task({title:'مطالعه کتاب',c:1,p:1});assert.notEqual(pick([shop,report,study],3*60+30).task.id,shop.id,'۱۶: فروشگاه نیمه‌شب پیشنهاد نشود');
-let call=task({title:'تماس با آقای رضایی',note:'با آقای رضایی تماس بگیرم',c:0,p:0});assert.equal(pick([call],3*60+30),null,'۱۷: تماس با شخص نیمه‌شب پیشنهاد نشود');
+let shop=task({title:'رفتن به فروشگاه',note:'امشب حتماً به فروشگاه بروم',c:3,p:0}),report=task({title:'نوشتن گزارش',note:'گزارش پروژه را بنویسم',c:4,p:1}),files=task({title:'مرتب‌کردن فایل‌ها',c:12,p:1});assert.notEqual(pick([shop,report,files],3*60+30).task.id,shop.id,'۱۶: فروشگاه نیمه‌شب پیشنهاد نشود');
+let call=task({title:'تماس با مشتری',note:'با مشتری تماس بگیرم',c:0,p:0});assert.equal(pick([call],3*60+30),null,'۱۷: تماس با شخص نیمه‌شب پیشنهاد نشود');
 assert.equal(A.evaluateDecisionTask(task({title:'کار بدون مدت'}),D,10*60).duration,null,'۱۸: مدت ساختگی ساخته نشود');
 assert.equal(A.evaluateDecisionTask(task({title:'کار بیست دقیقه‌ای',meta:{durationMin:20}}),D,10*60).duration,20,'۱۹: مدت ثبت‌شده حفظ شود');
 assert.equal(A.classify('هر ۸ ساعت قرص بخورم از ساعت ۸ صبح').meta.durationMin,undefined,'۲۰: فاصله تکرار به‌جای مدت کار ثبت نشود');
 assert.equal(A.titleFrom('فردا حتماً با آقای رضایی تماس بگیرم و درباره مبلغ نهایی قرارداد سایت صحبت کنم'),'تماس با آقای رضایی درباره قرارداد سایت','۲۱: عنوان عملیاتی کوتاه استخراج شود');
 assert.equal(A.titleFrom('خرید نان'),'خرید نان','۲۲: عنوان کوتاه سالم حفظ شود');
 A.reset();let studio=task({title:'گرفتن عکس از آتلیه',note:'عکس‌ها را از آتلیه بگیرم',c:12});A.recordDecisionEvent('reject',studio,{code:'custom',text:'آتلیه الان بسته است.'});assert.equal(A.getDecision().feedback[0].detail.text,'آتلیه الان بسته است.','۲۳: دلیل شخصی همراه کار ذخیره شود');
-let similarStudio=task({title:'تحویل عکس از آتلیه',note:'عکس‌ها را از آتلیه تحویل بگیرم',c:12}),plain=task({title:'مرتب کردن یادداشت‌ها',c:11});assert.equal(pick([similarStudio,plain],19*60).task.id,plain.id,'۲۴: بازخورد مشابه به‌صورت نرم در پیشنهاد بعدی اثر کند');
+let similarStudio=task({title:'تحویل عکس از آتلیه',note:'عکس‌ها را از آتلیه تحویل بگیرم',c:12}),plain=task({title:'مرتب کردن یادداشت‌ها',c:11});assert.equal(pick([similarStudio,plain],19*60).task.id,plain.id,'۲۴: گزینه قابل‌انجام بر گزینه نامشخص مقدم باشد');
 let restored={feedback:[{at:new Date().toISOString(),date:D,kind:'reject',taskId:999,taskKey:'999@x',detail:'no-time'}],history:[],context:{}};assert.doesNotThrow(()=>A.restoreDecision(restored),'۲۵: دلیل رد نسخه قبلی مهاجرت امن داشته باشد');
 
-console.log('۲۵ سناریوی تصمیم، عنوان و مهاجرت با موفقیت گذشت.');
+assert.equal(A.assessNowFeasibility(studio,{date:D,nowMin:3*60+30}).status,'blocked','۲۶: آتلیه در ساعت نامتعارف فعلاً قابل انجام نباشد');
+assert.equal(A.assessNowFeasibility(studio,{date:D,nowMin:11*60}).status,'unknown','۲۷: آتلیه در روز بدون حدس ساعت کاری نامشخص باشد');
+assert.equal(A.assessNowFeasibility(report,{date:D,nowMin:3*60+30}).status,'available','۲۸: نوشتن گزارش در شب حذف نشود');
+assert.equal(A.assessNowFeasibility(files,{date:D,nowMin:3*60+30}).status,'available','۲۹: مرتب‌کردن فایل‌ها در شب حذف نشود');
+let explicitNow=task({title:'گرفتن عکس از آتلیه',note:'رفتن به آتلیه',time:'03:00',c:12});assert.equal(A.assessNowFeasibility(explicitNow,{date:D,nowMin:3*60+30}).status,'available','۳۰: ساعت صریح کاربر بر قاعده شب مقدم باشد');
+let explicitFuture=task({title:'کار ساعت چهار',time:'04:00'});let futureState=A.assessNowFeasibility(explicitFuture,{date:D,nowMin:3*60+30});assert.equal(futureState.status,'blocked','۳۱: ساعت صریح آینده هنوز قابل انجام نباشد');assert.equal(futureState.source,'explicit-time','۳۲: دلیل کنارگذاری به شکل داده نگه داشته شود');
+let vague=task({title:'یک کار نامشخص',c:12});assert.equal(A.assessNowFeasibility(vague,{date:D,nowMin:12*60}).status,'unknown','۳۳: کمبود داده به‌جای غیرممکن، نامشخص باشد');assert.equal(pick([vague],12*60).task.id,vague.id,'۳۴: کار نامشخص در نبود گزینه مطمئن حذف نشود');
+let groups=A.partitionDecisionCandidates([studio,report,vague],D,3*60+30);assert.ok(groups.blocked.some(x=>x.task.id===studio.id)&&groups.available.some(x=>x.task.id===report.id)&&groups.unknown.some(x=>x.task.id===vague.id),'۳۵: سه وضعیت داخلی مستقل تفکیک شوند');
+let legacy=task({title:'کار قدیمی'});delete legacy.note;delete legacy.meta;assert.doesNotThrow(()=>A.assessNowFeasibility(legacy,{date:D,nowMin:12*60}),'۳۶: کار قدیمی بدون فیلد جدید خراب نشود');
+
+console.log('۳۶ سناریوی تصمیم، امکان‌پذیری و مهاجرت با موفقیت گذشت.');
