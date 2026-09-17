@@ -205,6 +205,35 @@ function learnCat(text,c){
   saveLearn();
 }
 
+/* ---- context: facts supported by the user's own wording, never invented ---- */
+const contextFact=(value,evidence,source='explicit',confidence=1)=>({value,evidence:evidence.trim(),source,confidence});
+function extractTaskContext(text,parsed={}){
+  const t=String(text||'').replace(/\s+/g,' ').trim();
+  const context={version:1,deadline:null,delayConsequence:null,opportunity:null,commitment:null,dependency:null,prerequisite:null,importance:null};
+  let m=t.match(/تا\s+(پس\s*فردا|فردا|امروز|(?:آخر|پایان)\s+(?:این\s+)?(?:هفته|ماه)|شنبه|یک[‌ ]?شنبه|دو[‌ ]?شنبه|سه[‌ ]?شنبه|چهار[‌ ]?شنبه|پنج[‌ ]?شنبه|جمعه)/);
+  if(m&&parsed.date)context.deadline=contextFact(parsed.date,m[0]);
+  m=t.match(/(?:وگرنه|در\s+غیر\s+این\s+صورت)\s+([^،,.؛]+)/);
+  if(m)context.delayConsequence=contextFact(m[1].trim(),m[0]);
+  m=t.match(/([^،,.؛]*(?:فرصت\s+از\s+دست|از\s+دست\s+می|آخرین\s+مهلت|تخفیف[^،,.؛]*(?:تمام|منقضی))[^،,.؛]*)/);
+  if(m)context.opportunity=contextFact(m[1].trim(),m[0]);
+  const people='مشتری|برنامه[‌ ]?نویس|همکار|مدیر|استاد|دکتر|آقای\s+[آ-ی‌]+|خانم\s+[آ-ی‌]+';
+  m=t.match(new RegExp(`((?:${people})[^،,.؛]{0,45}(?:منتظر(?:ه| است)?|معطل\s*می(?:شه|‌شود)|چشم\s*به\s*راه))`));
+  if(m){
+    context.commitment=contextFact(m[1],m[1]);
+    const who=(m[1].match(new RegExp(`(?:${people})`))||[])[0]||'شخص دیگری';
+    context.dependency=contextFact(`ادامه کار ${who} به این نتیجه وابسته است`,m[1],'inferred',.85);
+  }else{
+    m=t.match(/(قول\s+دادم[^،,.؛]*|متعهد\s+شدم[^،,.؛]*|باید\s+به\s+[^،,.؛]+\s+(?:تحویل|ارسال|بفرستم))/);
+    if(m)context.commitment=contextFact(m[1],m[1]);
+  }
+  m=t.match(/((?:اول\s+باید|قبل\s+از\s+این(?:که)?|نیاز\s+دارم\s+اول|بدون\s+[^،,.؛]+\s+نمی)[^،,.؛]*)/);
+  if(m)context.prerequisite=contextFact(m[1],m[1]);
+  m=t.match(/(خیلی\s+مهم|مهمه|مهم\s+است|فوری|ضروری|همین\s+الان|نباید\s+دیر)/);
+  if(m)context.importance=contextFact(/فوری|همین\s+الان|نباید\s+دیر/.test(m[1])?'urgent':'important',m[1]);
+  context.unknown=['deadline','delayConsequence','opportunity','commitment','dependency','prerequisite','importance'].filter(k=>context[k]===null);
+  return context;
+}
+
 /* ================= classify ================= */
 function classify(text){
   const t=(text||'').trim();
@@ -270,6 +299,7 @@ function classify(text){
   if(explicitDuration)meta.durationMin=taskDuration({title:t,note:t,c});
   if(/خیلی\s*مهم|مهمه|ضروری/.test(t)){meta.importance='high';meta.importanceReason='در توضیح کار مهم معرفی شده'}
   if(/فوری|همین\s*الان|سریع|ددلاین/.test(t)){meta.urgency='high';meta.urgencyReason='در توضیح کار فوریت دارد'}
+  meta.context=extractTaskContext(t,{date,today});
   return {c,s,p,rep,every,date,time,until,meta};
 }
 
@@ -291,6 +321,14 @@ function titleFrom(text){
     topic=topic.split(' ').slice(0,4).join(' ');
     return `تماس با ${person[1]}${topic?' درباره '+topic:''}`;
   }
+  let action=raw.split(/\s+(?:چون|وگرنه|در\s+غیر\s+این\s+صورت)\s+/)[0]
+    .replace(/^تا\s+(?:پس\s*فردا|فردا|امروز|(?:آخر|پایان)\s+(?:این\s+)?(?:هفته|ماه)|شنبه|یک[‌ ]?شنبه|دو[‌ ]?شنبه|سه[‌ ]?شنبه|چهار[‌ ]?شنبه|پنج[‌ ]?شنبه|جمعه)\s+/,'').trim();
+  let am=action.match(/^(.+?)\s+(?:را|رو)\s+(?:تموم|تمام)\s*(?:کنم|بکنم)$/);
+  if(am)return `تکمیل ${am[1].trim()}`;
+  am=action.match(/^(.+?)\s+(?:را|رو)\s+(?:بفرستم|ارسال\s+کنم)$/);
+  if(am)return `ارسال ${am[1].trim()}`;
+  am=action.match(/^(.+?)\s+(?:را|رو)\s+تحویل\s*(?:بدم|بدهم)$/);
+  if(am)return `تحویل ${am[1].trim()}`;
   let t=raw;
   T_KILL.forEach(r=>{t=t.replace(r,'')});
   t=t.replace(/(^|\s)(یادم\s*(?:بنداز|بیار)(?:\s*که)?|یادآوریم\s*کن(?:\s*که)?|یادآوری\s*کن(?:\s*که)?)(?=\s|$)/g,' ');

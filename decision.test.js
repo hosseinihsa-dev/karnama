@@ -1,7 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const mem={};
 global.localStorage={getItem:k=>mem[k]||null,setItem:(k,v)=>{mem[k]=String(v)}};
-const source=fs.readFileSync('core.js','utf8')+'\n'+fs.readFileSync('decision.js','utf8')+`\n;globalThis.api={TODAY,addDays,classify,titleFrom,decisionNowMinutes,assessNowFeasibility,partitionDecisionCandidates,decisionCandidates,evaluateDecisionTask,chooseNextTask,recordDecisionEvent,restoreDecision,setTasks:x=>S.tasks=x,getDecision:()=>DECISION,reset:()=>{DECISION={feedback:[],history:[],context:{}}}};`;
+const source=fs.readFileSync('core.js','utf8')+'\n'+fs.readFileSync('decision.js','utf8')+`\n;globalThis.api={TODAY,addDays,classify,extractTaskContext,titleFrom,contextPrioritySignals,decisionNowMinutes,assessNowFeasibility,partitionDecisionCandidates,decisionCandidates,evaluateDecisionTask,chooseNextTask,recordDecisionEvent,restoreDecision,setTasks:x=>S.tasks=x,getDecision:()=>DECISION,reset:()=>{DECISION={feedback:[],history:[],context:{}}}};`;
 vm.runInThisContext(source,{filename:'decision-bundle.js'});
 const A=global.api,D=A.TODAY();let id=100;
 const task=(x={})=>Object.assign({id:id++,title:'کار آزمایشی',note:'',c:12,p:1,s:1,date:D,done:false,rep:null,time:null},x);
@@ -46,4 +46,14 @@ let vague=task({title:'یک کار نامشخص',c:12});assert.equal(A.assessNow
 let groups=A.partitionDecisionCandidates([studio,report,vague],D,3*60+30);assert.ok(groups.blocked.some(x=>x.task.id===studio.id)&&groups.available.some(x=>x.task.id===report.id)&&groups.unknown.some(x=>x.task.id===vague.id),'۳۵: سه وضعیت داخلی مستقل تفکیک شوند');
 let legacy=task({title:'کار قدیمی'});delete legacy.note;delete legacy.meta;assert.doesNotThrow(()=>A.assessNowFeasibility(legacy,{date:D,nowMin:12*60}),'۳۶: کار قدیمی بدون فیلد جدید خراب نشود');
 
-console.log('۳۶ سناریوی تصمیم، امکان‌پذیری و مهاجرت با موفقیت گذشت.');
+let customer=A.classify('تا فردا گزارش رو بفرستم چون مشتری منتظره').meta.context;assert.ok(customer.deadline&&customer.commitment&&customer.dependency,'۳۷: ددلاین و تعهد و وابستگی صریح استخراج شوند');assert.equal(customer.delayConsequence,null,'۳۸: پیامد بدون شاهد ساخته نشود');
+let book=A.classify('این هفته کتاب بخونم').meta.context;assert.ok(!book.deadline&&!book.delayConsequence&&!book.commitment&&!book.dependency,'۳۹: مطالعه عادی Context ساختگی نگیرد');
+let designText='تا پنجشنبه طرح سایت رو تموم کنم چون برنامه‌نویس منتظره وگرنه پروژه عقب میفته',designParsed=A.classify(designText),design=designParsed.meta.context;assert.equal(A.titleFrom(designText),'تکمیل طرح سایت','۴۰: عنوان کوتاه عملیاتی استخراج شود');assert.ok(design.deadline&&design.dependency&&design.delayConsequence,'۴۱: زمینه واقعی طرح استخراج شود');assert.equal(design.dependency.source,'inferred','۴۲: استنباط سیستم از گفته صریح تفکیک شود');assert.ok(design.dependency.evidence.includes('برنامه‌نویس منتظره'),'۴۳: شاهد متن حفظ شود');
+let photo=A.classify('عکس‌های محمد رو از آتلیه بگیر').meta.context;assert.ok(!photo.deadline&&!photo.delayConsequence&&!photo.opportunity&&!photo.commitment&&!photo.dependency&&!photo.importance,'۴۴: برای آتلیه اهمیت یا پیامد اختراع نشود');
+let contextual=task({title:'ارسال گزارش',note:'تا فردا گزارش رو بفرستم چون مشتری منتظره',c:4,p:1,date:D,meta:{context:customer}}),ordinary=task({title:'مرتب کردن فایل‌ها',c:12,p:1,date:D});assert.equal(pick([ordinary,contextual],12*60).task.id,contextual.id,'۴۵: Context واقعی بین اولویت‌های یکسان تفاوت ایجاد کند');
+let blockedImportant=task({title:'عکس‌های محمد را از آتلیه بگیر',note:'تا فردا عکس‌ها را از آتلیه بگیرم وگرنه پروژه عقب میفته',c:3,p:0,meta:{context:A.classify('تا فردا عکس‌ها را از آتلیه بگیرم وگرنه پروژه عقب میفته').meta.context}});assert.equal(pick([blockedImportant,ordinary],3*60+30).task.id,ordinary.id,'۴۶: اهمیت بالا فیلتر امکان‌پذیری را دور نزند');
+assert.doesNotThrow(()=>A.evaluateDecisionTask(legacy,D,12*60),'۴۷: کار قدیمی بدون Context همچنان امتیاز بگیرد');
+let backed=JSON.parse(JSON.stringify({tasks:[contextual]}));assert.equal(backed.tasks[0].meta.context.commitment.evidence,customer.commitment.evidence,'۴۸: Context در JSON پشتیبان حفظ شود');
+let explained=A.evaluateDecisionTask(contextual,D,12*60).reason;assert.ok(explained.includes('فردا')&&explained.includes('وابسته'),'۴۹: دلیل پیشنهاد به داده واقعی تکیه کند');
+
+console.log('۴۹ سناریوی تصمیم، Context، امکان‌پذیری و مهاجرت با موفقیت گذشت.');
