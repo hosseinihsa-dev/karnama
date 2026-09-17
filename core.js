@@ -142,7 +142,7 @@ function dailyPlan(list,fromMin){
 
 /* ================= state ================= */
 const KEY='karnama.v1';
-let S={tab:0,sort:1,day:TODAY(),month:TODAY(),cat:null,sheet:false,pv:null,edit:null,planPreview:false,tasks:null};
+let S={tab:0,sort:1,day:TODAY(),month:TODAY(),cat:null,taskMode:'today',advisorChat:[],sheet:false,pv:null,edit:null,planPreview:false,tasks:null};
 function load(){
   try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&Array.isArray(r.tasks))return r.tasks}catch(e){}
   const t=TODAY();

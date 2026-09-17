@@ -105,5 +105,6 @@ A.reset();let closeA=task({title:'نوشتن یادداشت الف',c:11,p:1}),c
 let prereq=task({title:'راه‌اندازی پروژه',note:'اول باید دسترسی سرور را بگیرم',c:4,meta:A.classify('اول باید دسترسی سرور را بگیرم').meta});let prereqTrace=A.buildDecisionTrace(prereq,D,12*60);assert.equal(prereqTrace.feasibility.status,'unknown','۱۰۹: پیش‌نیاز حل‌نشده نامشخص بماند نه ساختگی یا قطعی');
 A.reset();let changeable=task({title:'تماس با علی',note:'با علی تماس بگیرم',c:0});A.setTasks([changeable]);A.recordDecisionEvent('reject',changeable,{code:'blocked'});assert.equal(A.decisionCandidates([changeable],D,12*60).length,0,'۱۱۰: کار ردشده در همان وضعیت دوباره پیشنهاد نشود');changeable.time='12:00';assert.equal(A.decisionCandidates([changeable],D,12*60).length,1,'۱۱۱: با تغییر اطلاعات همان کار دوباره قابل ارزیابی باشد');
 let legacyTrace=task({title:'کار نسخه قدیمی'});delete legacyTrace.meta;assert.doesNotThrow(()=>A.buildDecisionTrace(legacyTrace,D,12*60),'۱۱۲: داده قدیمی بدون فیلدهای مراحل جدید Trace امن بسازد');
+let untilNoon=task({title:'ارسال فایل تا ظهر',c:4,meta:{context:{version:1,timeConstraint:{value:'تا ظهر وقت دارم',evidence:'تا ظهر وقت دارم',source:'explicit-chat',confidence:1}}}});assert.equal(A.assessNowFeasibility(untilNoon,{date:D,nowMin:13*60}).status,'blocked','۱۱۳: محدودیت زمانی صریح گفت‌وگو در Gate اثر کند');
 
-console.log('۱۱۲ سناریوی موتور تصمیم، Context، حافظه و تاریخچه رفتار با موفقیت گذشت.');
+console.log('۱۱۳ سناریوی موتور تصمیم، Context، حافظه و تاریخچه رفتار با موفقیت گذشت.');

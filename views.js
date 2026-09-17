@@ -6,6 +6,11 @@ function taskCard(t,i){
       <div class="tmid"><div data-act="edit" data-id="${t.id}"><div class="ttl ${t.done?'done':''}">${esc(t.title)}${t.doseAll>1?` <span style="color:#8A8D95;font-weight:500">(نوبت ${fa(t.doseN)} از ${fa(t.doseAll)})</span>`:''}</div>${t.note&&t.note!==t.title?`<div class="note">${esc(t.note)}</div>`:''}</div><div class="chips">${taskChips(t)}</div></div>
       <span class="rank">${fa(String(i+1).padStart(2,'0'))}</span></div>`;
 }
+function advisorTaskPool(date=TODAY()){
+  const tasks=[...S.tasks],now=new Date(),slot=slotOfTime(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
+  (STUDY||[]).filter(p=>studyRemaining(p)>0&&studyActive(p,date)).forEach(p=>tasks.push({id:-Math.abs(+p.id||1),title:`مطالعه ${p.title}`,note:`برنامه مطالعه ${p.title}`,c:1,p:1,s:slot,date,done:false,rep:null,time:null,meta:{advisorStudy:true,studyId:p.id}}));
+  return tasks;
+}
 
 /* ================= render ================= */
 function render(){
@@ -14,10 +19,12 @@ function render(){
   const overdue=S.tasks.filter(t=>!t.rep&&!t.done&&t.date<today).sort(bySlot);
   const list=instOn(today);
   const doneN=list.filter(t=>t.done).length;
-  document.getElementById('sub').textContent=fa(`${WD[wdIndex(today)]} ${jdate(today)} · ${list.length} کار برای امروز · ${doneN} انجام شده`);
+  document.getElementById('greet').textContent=S.tab===0?'سلام؛ بیا فقط قدم بعدی را پیدا کنیم':S.tab===7?'کارها':'سلام! امروز مال توست';
+  document.getElementById('sub').textContent=S.tab===0?fa(`${WD[wdIndex(today)]} ${jdate(today)}`):fa(`${list.length} کار برای امروز · ${doneN} انجام شده`);
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',+b.dataset.tab===S.tab));
   const v=document.getElementById('view');
-  v.innerHTML=[todayView,tomorrowView,weekView,monthView,catView,studyView,plannerPage][S.tab](overdue,list,doneN,today);
+  const pages={0:advisorHome,1:tomorrowView,2:weekView,3:monthView,4:catView,5:studyView,6:plannerPage,7:tasksView};
+  v.innerHTML=(pages[S.tab]||advisorHome)(overdue,list,doneN,today);
   v.querySelectorAll('[data-act]').forEach(el=>{
     el.onclick=()=>{
       const id=+el.dataset.id,a=el.dataset.act;
@@ -41,15 +48,40 @@ function render(){
       else if(a==='studyExtend'){const p=studyById(id);if(p){p.endDate=nextStudyDate(p,addDays(TODAY(),1),6);saveStudy();render();toast('مهلت مطالعه هفت جلسه تمدید شد.')}}
       else if(a==='studyDelete')removeStudyWithUndo(id);
       else if(a==='decisionStart'){
-        const x=decisionCandidates(S.tasks,TODAY()).find(t=>t.id===id&&decisionKey(t)===(el.dataset.key||decisionKey(t)))||byId(id);
+        const x=decisionCandidates(S.tab===0?advisorTaskPool():S.tasks,TODAY()).find(t=>t.id===id&&decisionKey(t)===(el.dataset.key||decisionKey(t)))||byId(id);
         if(x){recordDecisionEvent('start',x);toast(`«${x.title}» را شروع کردی؛ وقتی تمام شد تیک انجام را بزن.`,3500)}
       }
       else if(a==='decisionReject')decisionRejectPicker(id,el.dataset.key);
+      else if(a==='decisionDone'){const x=decisionCandidates(S.tab===0?advisorTaskPool():S.tasks,TODAY()).find(t=>t.id===id&&decisionKey(t)===(el.dataset.key||decisionKey(t)))||byId(id);if(x&&x.meta&&x.meta.advisorStudy){const p=studyById(x.meta.studyId),st=p&&studyStats(p);if(p&&st.target)addStudyProgress(p.id,st.target)}else if(x)toggle(x.id,x.key||TODAY());toast('انجام شد؛ پیشنهاد بعدی را بررسی کردم.',2600)}
+      else if(a==='taskMode'){S.taskMode=el.dataset.v;render()}
       else if(a==='planPreview'){S.planPreview=true;render()}
       else if(a==='planClose'){S.planPreview=false;S.tab=0;render()}
       else if(a==='planApprove'){approvePlan(list);S.planPreview=false;render();toast('برنامه امروز تأیید شد.',2800)}
     };
   });
+  bindAdvisorChat();
+}
+
+function advisorHome(overdue,list,doneN,today){
+  const x=chooseNextTask(advisorTaskPool(today),today),chat=(S.advisorChat||[]).slice(-6);
+  let h=`<div class="advisor-intro"><span>همین الآن</span><h2>قرار نیست همه‌چیز را با هم حل کنی.</h2><p>فقط یک قدم قابل‌دفاع انتخاب می‌کنیم؛ تصمیم آخر با توست.</p></div>`;
+  h+=decisionPanel(today,x,true);
+  h+=`<section class="advisor-chat"><div class="advisor-chat-head"><b>با کارنما درباره همین پیشنهاد حرف بزن</b><span>کوتاه و اجرایی</span></div>${chat.length?`<div class="advisor-messages">${chat.map(m=>`<div class="advisor-msg ${m.role}">${esc(m.text)}</div>`).join('')}</div>`:''}<div class="advisor-compose"><textarea id="advisor-input" rows="2" placeholder="مثلاً: یه کار سبک‌تر بهم بده"></textarea><button id="advisor-voice" aria-label="گفت‌وگوی صوتی با کارنما"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4m7-4a7 7 0 0 1-14 0m7 7v4m-4 0h8"/></svg></button><button id="advisor-send">بفرست</button></div><div class="advisor-hints"><button data-advisor-text="چرا این کار؟">چرا این؟</button><button data-advisor-text="یه کار سبک‌تر بده">کار سبک‌تر</button><button data-advisor-text="این رو بذار برای فردا">بذار فردا</button></div></section>`;
+  return h;
+}
+
+function tasksView(overdue,list,doneN,today){
+  const modes=[['today','امروز'],['tomorrow','فردا'],['dates','تاریخ‌ها'],['done','انجام‌شده']];
+  let h=`<div class="tasks-head"><div><span>مدیریت</span><h2>همه کارها</h2></div><button data-act="backup" data-id="0">پشتیبان</button></div><div class="task-modes">${modes.map(x=>`<button class="${S.taskMode===x[0]?'on':''}" data-act="taskMode" data-v="${x[0]}" data-id="0">${x[1]}</button>`).join('')}</div>`;
+  if(S.taskMode==='tomorrow')return h+tomorrowView();
+  if(S.taskMode==='dates')return h+monthView();
+  if(S.taskMode==='done'){
+    const done=S.tasks.filter(t=>!t.rep&&t.done).sort((a,b)=>b.date.localeCompare(a.date));
+    return h+`<div class="list">${done.length?done.map((t,i)=>taskCard(Object.assign({},t,{done:true,key:t.date}),i)).join(''):'<div class="empty">هنوز کار انجام‌شده‌ای برای نمایش نیست.</div>'}</div>`;
+  }
+  const sorted=[...list].sort(bySlot);if(overdue.length)h+=`<div class="tasks-overdue-note">${fa(overdue.length)} کار عقب‌افتاده هم پایین فهرست امروز دیده می‌شود.</div>`;
+  const combined=[...sorted,...overdue.filter(t=>!sorted.some(x=>x.id===t.id))];
+  return h+`<div class="list">${combined.length?combined.map((t,i)=>taskCard(t,i)).join(''):'<div class="empty">امروز کاری ثبت نشده.</div>'}</div>`;
 }
 
 function todayView(overdue,list,doneN,today){
@@ -97,22 +129,22 @@ function todayView(overdue,list,doneN,today){
   return h;
 }
 
-function decisionPanel(today){
-  const x=chooseNextTask(S.tasks,today);
-  if(!x)return `<section class="decision-card empty-decision"><div class="decision-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V18h8v-2.3A7 7 0 0 0 12 3m-3 18h6"/></svg><span>الان چیکار کنم؟</span></div><p>فعلاً کار مناسبی برای پیشنهاد ندارم. لازم نیست چیزی را تصادفی شروع کنی.</p></section>`;
+function decisionPanel(today,x=chooseNextTask(S.tasks,today),advisor=false){
+  if(!x)return `<section class="decision-card empty-decision ${advisor?'advisor-decision':''}"><div class="decision-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V18h8v-2.3A7 7 0 0 0 12 3m-3 18h6"/></svg><span>الان چیکار کنم؟</span></div><p>فعلاً کار مشخصی ندارم که با اطمینان پیشنهاد بدهم.</p></section>`;
   const t=x.task,key=decisionKey(t),when=t.time?` · ${fa(t.time)}`:'';
   recordSuggestedBehavior(t,x);
-  return `<section class="decision-card"><div class="decision-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V18h8v-2.3A7 7 0 0 0 12 3m-3 18h6"/></svg><span>الان چیکار کنم؟</span></div>
-    <div class="decision-label">پیشنهاد کارنما</div><h2>${esc(t.title)}</h2>
+  return `<section class="decision-card ${advisor?'advisor-decision':''}"><div class="decision-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V18h8v-2.3A7 7 0 0 0 12 3m-3 18h6"/></svg><span>${advisor?'پیشنهاد من برای الآن':'الان چیکار کنم؟'}</span></div>
+    <div class="decision-label">${advisor?'به نظرم الآن بهتره روی این تمرکز کنی':'پیشنهاد کارنما'}</div><h2>${esc(t.title)}</h2>
     <div class="decision-meta"><span>${CATS[t.c].name}${when}</span>${x.duration?`<span>${fa(x.duration)} دقیقه</span>`:''}</div>
     <p class="decision-reason">${esc(x.reason)}</p>
     <div class="decision-actions"><button class="decision-later" data-act="decisionReject" data-id="${t.id}" data-key="${esc(key)}">الان نمی‌تونم</button><button class="decision-start" data-act="decisionStart" data-id="${t.id}" data-key="${esc(key)}">شروع می‌کنم</button></div>
+    ${advisor?`<button class="decision-done" data-act="decisionDone" data-id="${t.id}" data-key="${esc(key)}">این کار را انجام دادم</button>`:''}
     ${x.secondaryWarning?`<div class="decision-secondary"><b>برای بعد یادت باشد:</b> «${esc(x.secondaryWarning.task.title)}» مهم است، اما الآن ${esc(x.secondaryWarning.reason)}</div>`:''}
   </section>`;
 }
 
 function decisionRejectPicker(id,key){
-  const t=decisionCandidates(S.tasks,TODAY()).find(x=>x.id===id&&decisionKey(x)===key)||byId(id);if(!t)return;
+  const t=decisionCandidates(S.tab===0?advisorTaskPool():S.tasks,TODAY()).find(x=>x.id===id&&decisionKey(x)===key)||byId(id);if(!t)return;
   pk._onDismiss=null;
   pk.classList.remove('cat-mode');pkbx.classList.remove('cat-mode');
   const reasons=[['no-time','وقت ندارم'],['no-energy','انرژی ندارم'],['blocked','شرایطش فراهم نیست'],['other','دلیل دیگر']];
@@ -123,6 +155,56 @@ function decisionRejectPicker(id,key){
   pkbx.querySelectorAll('.op').forEach((b,i)=>b.onclick=()=>finish(reasons[i][0]));
   pkbx.querySelector('[data-own-reason]').onclick=()=>{const input=pkbx.querySelector('#decision-own-reason');if(!input.value.trim()){toast('اگر خواستی دلیل خودت را بنویس؛ یا یکی از گزینه‌های بالا را بزن.',3000);input.focus();return}finish('custom',input.value)};
   pk.classList.add('show');
+}
+
+function advisorSay(role,text){S.advisorChat=S.advisorChat||[];S.advisorChat.push({role,text,at:new Date().toISOString()});if(S.advisorChat.length>24)S.advisorChat=S.advisorChat.slice(-24)}
+function advisorNextText(){const n=chooseNextTask(advisorTaskPool(),TODAY());return n?`پیشنهاد بعدی من «${n.task.title}» است؛ ${n.reason}.`:'فعلاً کار مشخص دیگری ندارم که با اطمینان پیشنهاد بدهم.'}
+function setChatPrerequisite(t,text){
+  const base=byId(t.id);if(!base)return;const m=text.match(/(?:بدون|اول\s+باید)\s+(.+?)(?:\s+(?:نمی|نمیشه|نمی‌شه|انجام|باشه|بشه)|$)/),value=(m&&m[1]||text).trim();
+  base.meta=base.meta&&typeof base.meta==='object'?base.meta:{};const context=Object.assign({version:1},taskContext(base)||extractTaskContext(base.note||base.title,{date:base.date}));context.prerequisite=contextFact(value,text,'explicit-chat',1);base.meta.context=updateContextUnknown(context);save();
+}
+function handleAdvisorMessage(raw){
+  const text=raw.trim();if(!text)return;advisorSay('user',text);const x=chooseNextTask(advisorTaskPool(),TODAY()),t=x&&x.task,base=t&&byId(t.id);if(!t){advisorSay('assistant','فعلاً پیشنهادی ندارم؛ می‌توانی از بخش «کارها» چیزی اضافه یا اصلاح کنی.');render();return}
+  if(t.meta&&t.meta.advisorStudy){
+    if(/چرا|دلیل/.test(text))advisorSay('assistant',`دلیل پیشنهادم اینه که ${x.reason}.`);
+    else if(/انجامش دادم|انجام شد|خوندم|خواندم/.test(text)){const p=studyById(t.meta.studyId),st=p&&studyStats(p);if(p&&st.target)addStudyProgress(p.id,st.target);advisorSay('assistant',`مطالعه امروز ثبت شد. ${advisorNextText()}`)}
+    else if(/سبک|حوصله|انرژی|نمی.?تونم/.test(text)){recordDecisionEvent('reject',t,{code:'no-energy',text});advisorSay('assistant',advisorNextText())}
+    else advisorSay('assistant','درباره این پیشنهاد می‌توانی دلیلش را بپرسی، بگویی امروز مطالعه کردی یا یک گزینه سبک‌تر بخواهی.');
+    render();return
+  }
+  if(!base){advisorSay('assistant','این پیشنهاد از برنامه مطالعه آمده و ویرایشش از بخش «مطالعه» انجام می‌شود.');render();return}
+  if(/چرا|دلیل/.test(text)){advisorSay('assistant',`دلیل پیشنهادم اینه که ${x.reason}.`);render();return}
+  if(/بدون\s+.+(?:نمی|نمیشه|نمی‌شه)|اول\s+باید/.test(text)){
+    setChatPrerequisite(t,text);recordDecisionEvent('reject',t,{code:'blocked',text});advisorSay('assistant',`این مانع را برای همین کار ثبت کردم. ${advisorNextText()}`);render();return
+  }
+  if(/(?:بذار|بزار|منتقل).*(?:فردا)|فردا.*(?:انجام|بذار|بزار)/.test(text)){
+    const from=base.date,to=addDays(TODAY(),1);recordTaskPostponedBehavior(base,from,to);base.date=to;base.moved=(base.moved||0)+1;save();advisorSay('assistant',`«${base.title}» را برای فردا گذاشتم. ${advisorNextText()}`);render();return
+  }
+  if(/سبک|آسون|آسان|کوتاه/.test(text)){
+    recordDecisionEvent('reject',t,{code:'lighter',text});advisorSay('assistant',advisorNextText());render();return
+  }
+  if(/حوصله|انرژی|خسته/.test(text)){
+    recordDecisionEvent('reject',t,{code:'no-energy',text});advisorSay('assistant',`متوجه شدم. ${advisorNextText()}`);render();return
+  }
+  if(/(?:انجامش دادم|انجام شد|تموم شد|تمام شد)/.test(text)){
+    if(base.rep){base.doneOn=base.doneOn||{};base.doneOn[t.key||TODAY()]=1}else base.done=true;recordTaskCompletedBehavior(base,t.key||TODAY());save();advisorSay('assistant',`ثبت شد. ${advisorNextText()}`);render();return
+  }
+  const moreImportant=text.match(/(?:پروژه|کار)?\s*([آ-ی‌]{2,}(?:\s+[آ-ی‌]{2,}){0,2})\s+مهم.?تر/);
+  if(moreImportant){const needle=norm(moreImportant[1]),target=S.tasks.find(z=>z.id!==base.id&&norm(z.title).includes(needle));if(target){target.p=0;target.meta=target.meta&&typeof target.meta==='object'?target.meta:{};target.meta.importance='high';target.meta.importanceReason=text;if(/مهم نیست/.test(text))base.p=2;save();advisorSay('assistant',`اولویت «${target.title}» را بالاتر ثبت کردم. ${advisorNextText()}`);render();return}}
+  if(/مهم نیست|کم.?اهمیت/.test(text)){
+    base.p=2;base.meta=base.meta&&typeof base.meta==='object'?base.meta:{};base.meta.importance='low';base.meta.importanceReason=text;save();advisorSay('assistant',`اهمیت «${base.title}» را اصلاح کردم. ${advisorNextText()}`);render();return
+  }
+  if(/تا\s+(?:ظهر|عصر|شب)|فقط.*وقت/.test(text)){
+    base.meta=base.meta&&typeof base.meta==='object'?base.meta:{};const context=Object.assign({version:1},taskContext(base)||extractTaskContext(base.note||base.title,{date:base.date}));context.timeConstraint=contextFact(text,text,'explicit-chat',1);base.meta.context=updateContextUnknown(context);save();advisorSay('assistant','این محدودیت زمانی را برای همین کار ثبت کردم و در تصمیم‌های بعدی در نظر می‌گیرم.');render();return
+  }
+  advisorSay('assistant','می‌توانم دلیل پیشنهاد را توضیح بدهم، مانع یا پیش‌نیاز ثبت کنم، کار را به فردا ببرم یا گزینه سبک‌تری پیشنهاد بدهم.');render();
+}
+function bindAdvisorChat(){
+  const input=document.getElementById('advisor-input'),send=document.getElementById('advisor-send'),voice=document.getElementById('advisor-voice');if(!input||!send)return;
+  const submit=()=>{const text=input.value.trim();if(text)handleAdvisorMessage(text)};send.onclick=submit;input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit()}};
+  document.querySelectorAll('[data-advisor-text]').forEach(b=>b.onclick=()=>handleAdvisorMessage(b.dataset.advisorText));
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!voice)return;if(!SpeechRecognition){voice.classList.add('unsupported');voice.disabled=true;return}
+  voice.onclick=()=>{const rec=new SpeechRecognition();rec.lang='fa-IR';rec.interimResults=false;voice.classList.add('listening');rec.onresult=e=>{const text=e.results&&e.results[0]&&e.results[0][0]&&e.results[0][0].transcript;if(text)handleAdvisorMessage(text)};rec.onerror=e=>{if(e.error!=='aborted')toast('صدا تشخیص داده نشد؛ می‌توانی تایپ کنی.',3000)};rec.onend=()=>voice.classList.remove('listening');try{rec.start()}catch(e){voice.classList.remove('listening')}};
 }
 
 function plannerPage(overdue,list,doneN,today){
@@ -542,7 +624,7 @@ sb.onclick=()=>{
   if(duplicateOf(newTask)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
   S.tasks.push(newTask);
   const question=detectImportantAmbiguity(newTask),entry=question?registerClarificationQuestion(newTask,question):null;
-  save();closeSheet();S.tab=g.date===addDays(today,1)?1:0;S.day=g.date;S.pv=null;dr.value='';render();
+  save();closeSheet();S.tab=0;S.day=g.date;S.pv=null;dr.value='';render();
   if(entry)setTimeout(()=>clarificationPicker(newTask,question,entry),80);
   else toast(`اضافه شد به «${CATS[g.c].name}»${g.rep?' · '+repLabel(g)+(g.until?' تا '+fa(jdate(g.until)):''):''} · پیشنهاد: ${dl} ${g.time?fa(g.time):SLOTS[g.s]}`);
 };
@@ -552,7 +634,7 @@ document.getElementById('sh-del').onclick=()=>{
   const id=S.edit;S.edit=null;closeSheet();removeWithUndo(id);
 };
 
-document.querySelectorAll('nav button[data-tab]').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===2)S.day=TODAY();if(S.tab===3){S.month=TODAY();S.day=TODAY()}if(S.tab===4)S.cat=null;render()});
+document.querySelectorAll('nav button[data-tab]').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===7&&!S.taskMode)S.taskMode='today';if(S.tab===3){S.month=TODAY();S.day=TODAY()}if(S.tab===4)S.cat=null;render()});
 
 const sideMenu=document.getElementById('side-menu'),menuBtn=document.getElementById('menu-btn');
 function openMenu(){sideMenu.classList.add('show');sideMenu.setAttribute('aria-hidden','false');menuBtn.setAttribute('aria-expanded','true');document.body.classList.add('menu-open')}
@@ -561,7 +643,7 @@ menuBtn.onclick=openMenu;
 document.getElementById('menu-close').onclick=closeMenu;
 sideMenu.querySelector('.side-scrim').onclick=closeMenu;
 document.getElementById('menu-categories').onclick=()=>{S.tab=4;S.cat=null;closeMenu();render()};
-document.getElementById('menu-week').onclick=()=>{S.tab=2;S.day=TODAY();closeMenu();render()};
+document.getElementById('menu-week').onclick=()=>{S.tab=7;S.taskMode='dates';S.day=TODAY();S.month=TODAY();closeMenu();render()};
 document.getElementById('menu-planner').onclick=()=>{S.tab=6;S.planPreview=true;closeMenu();render()};
 document.getElementById('menu-memory').onclick=()=>{closeMenu();userMemoryPicker()};
 document.getElementById('side-backup').onclick=()=>{closeMenu();doBackup()};

@@ -34,6 +34,10 @@ function assessNowFeasibility(t,{date=TODAY(),nowMin=decisionNowMinutes()}={}){
   const remembered=userMemorySignal(t,nowMin);
   if(remembered&&remembered.hard)return result(FEASIBLE_NOW.NO,`طبق چیزی که گفته‌ای: ${remembered.reason}`,'user-memory-explicit',remembered.memory.confidence);
   const context=taskContext(t);
+  if(context&&context.timeConstraint&&typeof context.timeConstraint.value==='string'){
+    const value=norm(context.timeConstraint.value),cutoff=/تا\s*ظهر/.test(value)?12*60:/تا\s*عصر/.test(value)?18*60:/تا\s*شب/.test(value)?22*60:null;
+    if(cutoff!==null&&nowMin>cutoff)return result(FEASIBLE_NOW.NO,'بازه زمانی صریحی که کاربر گفته گذشته است','explicit-time-constraint',1);
+  }
   if(context&&context.prerequisite&&context.prerequisite.value)return result(FEASIBLE_NOW.UNKNOWN,'این کار پیش‌نیازی دارد که انجام‌شدنش هنوز مشخص نیست','explicit-prerequisite',.65);
 
   const external=/آتلیه|فروشگاه|مغازه|اداره|بانک|دفتر|مطب|پست|داروخانه|خرید حضوری|تحویل\s*(?:بگیر|بگیرم)|مراجعه/.test(text)||[3,7].includes(t.c);
