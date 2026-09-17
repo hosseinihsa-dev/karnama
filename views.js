@@ -156,7 +156,9 @@ function decisionRejectPicker(id,key){
   pk.classList.add('show');
 }
 
-function advisorSay(role,text){S.advisorChat=S.advisorChat||[];S.advisorChat.push({role,text,at:new Date().toISOString()});if(S.advisorChat.length>24)S.advisorChat=S.advisorChat.slice(-24)}
+const ADVISOR_CHAT_KEY='karnama.advisor.chat.v1';let ACTIVE_SPEECH=null;
+try{if(!S.advisorChat.length){const saved=JSON.parse(localStorage.getItem(ADVISOR_CHAT_KEY));if(Array.isArray(saved))S.advisorChat=saved.slice(-24)}}catch(e){}
+function advisorSay(role,text){S.advisorChat=S.advisorChat||[];S.advisorChat.push({role,text,at:new Date().toISOString()});if(S.advisorChat.length>24)S.advisorChat=S.advisorChat.slice(-24);try{localStorage.setItem(ADVISOR_CHAT_KEY,JSON.stringify(S.advisorChat))}catch(e){}}
 function advisorNextText(){const n=chooseNextTask(advisorTaskPool(),TODAY());return n?`پیشنهاد بعدی من «${n.task.title}» است؛ ${n.reason}.`:'فعلاً کار مشخص دیگری ندارم که با اطمینان پیشنهاد بدهم.'}
 function advisorTaskReference(text,current){
   const n=norm(text),active=S.tasks.filter(t=>!t.done);if(/(?:این|همین|این یکی|همین یکی)s*(?:کار)?/.test(n)&&current)return current;
@@ -203,7 +205,12 @@ function handleAdvisorMessage(raw){
     const made=addTaskFromAdvisor(text);if(made.duplicate)advisorSay('assistant',`«${made.task.title}» از قبل در کارهایت هست.`);else{const t=made.task,when=t.date===TODAY()?'امروز':t.date===addDays(TODAY(),1)?'فردا':fa(jdate(t.date));advisorSay('assistant',`فهمیدم که این یک کار است؛ «${t.title}» را برای ${when}${t.time?' ساعت '+fa(t.time):''} در «${CATS[t.c].name}» ثبت کردم.`)}render();return
   }
   const x=chooseNextTask(advisorTaskPool(),TODAY()),t=x&&x.task,base=t&&byId(t.id);if(!t){advisorSay('assistant','فعلاً پیشنهادی ندارم؛ اگر کاری در ذهنت هست طبیعی بنویس تا ثبتش کنم.');render();return}
+  S.advisorContext={taskId:t.id,taskKey:decisionKey(t),at:new Date().toISOString()};
+  if(/^(سلام|سلام خوبی|خوبی|چه خبر)/.test(norm(text))){advisorSay('assistant',`سلام. حواسم به کارهایت هست؛ الآن پیشنهادم «${t.title}» است. می‌خواهی دلیلش را بگویم یا گزینه دیگری پیدا کنم؟`);render();return}
+  if(/^(مرسی|ممنون|دمت گرم|باشه ممنون)/.test(norm(text))){advisorSay('assistant','خواهش می‌کنم. هر تغییری در شرایطت پیش آمد همین‌جا بگو تا پیشنهاد را دوباره تنظیم کنم.');render();return}
+  if(/^(نه|نه این نه|این نه|یکی دیگه|یه چیز دیگه|پس چی)/.test(norm(text))){recordDecisionEvent('reject',t,{code:'conversation-skip',text});advisorSay('assistant',`باشه، این گزینه را فعلاً کنار گذاشتم. ${advisorNextText()}`);render();return}
   if(/کارهای امروز|کارای امروز/.test(text)){const items=instOn(TODAY()).filter(z=>!z.done).slice(0,5);advisorSay('assistant',items.length?`امروز ${fa(items.length)} کار اولت این‌هاست: ${items.map(z=>`«${z.title}»`).join('، ')}${instOn(TODAY()).filter(z=>!z.done).length>5?' و چند کار دیگر.':'.'}`:'برای امروز کار انجام‌نشده‌ای نداری.');render();return}
+  if(/کارهای فردا|کارای فردا|فردا چی دارم/.test(text)){const items=instOn(addDays(TODAY(),1)).filter(z=>!z.done).slice(0,5);advisorSay('assistant',items.length?`برای فردا این‌ها را داری: ${items.map(z=>`«${z.title}»`).join('، ')}.`:'برای فردا هنوز کاری ثبت نکرده‌ای.');render();return}
   if(/الان چیکار|چه کار.*انجام/.test(text)){advisorSay('assistant',`پیشنهاد من «${t.title}» است؛ ${x.reason}.`);render();return}
   if(t.meta&&t.meta.advisorStudy){
     if(/چرا|دلیل/.test(text))advisorSay('assistant',`دلیل پیشنهادم اینه که ${x.reason}.`);
@@ -237,7 +244,7 @@ function handleAdvisorMessage(raw){
   if(/تا\s+(?:ظهر|عصر|شب)|فقط.*وقت/.test(text)){
     base.meta=base.meta&&typeof base.meta==='object'?base.meta:{};const context=Object.assign({version:1},taskContext(base)||extractTaskContext(base.note||base.title,{date:base.date}));context.timeConstraint=contextFact(text,text,'explicit-chat',1);base.meta.context=updateContextUnknown(context);save();advisorSay('assistant','این محدودیت زمانی را برای همین کار ثبت کردم و در تصمیم‌های بعدی در نظر می‌گیرم.');render();return
   }
-  advisorSay('assistant','می‌توانم دلیل پیشنهاد را توضیح بدهم، مانع یا پیش‌نیاز ثبت کنم، کار را به فردا ببرم یا گزینه سبک‌تری پیشنهاد بدهم.');render();
+  advisorSay('assistant',`من حرفت را به همین پیشنهاد ربط دادم، اما هنوز دقیق نفهمیدم چه تغییری می‌خواهی. می‌توانی مثلاً بگویی «چرا؟»، «این نه»، «بذارش فردا» یا اسم کار مهم‌تر را بگویی.`);render();
 }
 function bindAdvisorChat(){
   const input=document.getElementById('advisor-input'),send=document.getElementById('advisor-send'),voice=document.getElementById('advisor-voice'),plus=document.getElementById('coach-plus'),stage=document.getElementById('voice-stage');if(!input||!send)return;
@@ -245,19 +252,18 @@ function bindAdvisorChat(){
   if(plus)plus.onclick=()=>openSheet();
   document.querySelectorAll('[data-advisor-text]').forEach(b=>b.onclick=()=>handleAdvisorMessage(b.dataset.advisorText));
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!voice)return;
-  voice.onclick=async()=>{
-    if(!SpeechRecognition){toast('تشخیص گفتار در این مرورگر در دسترس نیست؛ کارنما را با Chrome به‌روز باز کن.',5000);return}
-    voice.disabled=true;let stream=null;
-    try{if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){stream=await navigator.mediaDevices.getUserMedia({audio:true});stream.getTracks().forEach(t=>t.stop())}}
-    catch(e){voice.disabled=false;toast('اجازه میکروفون داده نشده؛ از تنظیمات سایت، Microphone را روی Allow بگذار.',6000);return}
-    const rec=new SpeechRecognition(),out=document.getElementById('voice-transcript');let finalText='',started=false;
-    const close=()=>{voice.disabled=false;voice.classList.remove('listening');document.body.classList.remove('voice-listening');if(stage){stage.classList.remove('show');stage.setAttribute('aria-hidden','true')}};
+  voice.onclick=()=>{
+    if(!SpeechRecognition){toast('این نسخه مرورگر تشخیص گفتار را پشتیبانی نمی‌کند؛ با Chrome به‌روز امتحان کن.',6000);return}
+    if(ACTIVE_SPEECH){try{ACTIVE_SPEECH.abort()}catch(e){}ACTIVE_SPEECH=null}
+    const rec=new SpeechRecognition(),out=document.getElementById('voice-transcript');let finalText='',started=false,errorShown=false;ACTIVE_SPEECH=rec;
+    voice.disabled=true;voice.classList.add('listening');document.body.classList.add('voice-listening');if(stage){stage.classList.add('show');stage.setAttribute('aria-hidden','false')}if(out)out.textContent='در حال فعال‌کردن میکروفون...';
+    const close=()=>{ACTIVE_SPEECH=null;voice.disabled=false;voice.classList.remove('listening');document.body.classList.remove('voice-listening');if(stage){stage.classList.remove('show');stage.setAttribute('aria-hidden','true')}};
     rec.lang='fa-IR';rec.interimResults=true;rec.continuous=false;
-    rec.onstart=()=>{started=true;voice.classList.add('listening');document.body.classList.add('voice-listening');if(stage){stage.classList.add('show');stage.setAttribute('aria-hidden','false')}if(out)out.textContent='دارم گوش می‌دهم...'};
+    rec.onstart=()=>{started=true;if(out)out.textContent='دارم گوش می‌دهم...'};
     const stop=()=>{try{rec.stop()}catch(e){close()}};const closeBtn=document.getElementById('voice-close'),stopBtn=document.getElementById('voice-stop');if(closeBtn)closeBtn.onclick=stop;if(stopBtn)stopBtn.onclick=stop;
     rec.onresult=e=>{let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const part=e.results[i][0].transcript;if(e.results[i].isFinal)finalText+=part;else interim+=part}if(out)out.textContent=finalText||interim||'دارم گوش می‌دهم...'};
-    rec.onerror=e=>{const msg=e.error==='not-allowed'||e.error==='service-not-allowed'?'اجازه میکروفون مسدود است؛ در تنظیمات Chrome برای این سایت فعالش کن.':e.error==='network'?'سرویس تشخیص گفتار Chrome به اینترنت دسترسی ندارد؛ اتصال را بررسی کن.':e.error==='audio-capture'?'میکروفون گوشی در دسترس نیست یا برنامه دیگری از آن استفاده می‌کند.':e.error==='no-speech'?'صدایی دریافت نشد؛ دوباره بزن و کمی نزدیک‌تر صحبت کن.':'تشخیص صدا شروع نشد؛ دوباره امتحان کن.';toast(msg,6000);close()};
-    rec.onend=()=>{close();if(finalText.trim())handleAdvisorMessage(finalText.trim());else if(started&&!document.querySelector('#toast.show'))toast('چیزی نشنیدم؛ دوباره امتحان کن.',3500)};
+    rec.onerror=e=>{errorShown=true;const msg=e.error==='not-allowed'||e.error==='service-not-allowed'?'اجازه میکروفون بسته است. روی قفل کنار آدرس سایت بزن و Microphone را روی Allow بگذار.':e.error==='network'?'تشخیص گفتار Chrome به اینترنت وصل نشد. VPN را خاموش و روشن کن یا اتصال دیگری امتحان کن.':e.error==='audio-capture'?'میکروفون در دسترس نیست؛ برنامه‌های ضبط صدا یا تماس را ببند.':e.error==='language-not-supported'?'تشخیص فارسی روی این نسخه Chrome پشتیبانی نمی‌شود.':e.error==='no-speech'?'صدایی نشنیدم؛ دوباره بزن و بعد از بازشدن صفحه صحبت کن.':`خطای وویس: ${e.error||'نامشخص'}`;if(out)out.textContent=msg;toast(msg,7000);setTimeout(close,1800)};
+    rec.onend=()=>{if(finalText.trim()){close();handleAdvisorMessage(finalText.trim())}else if(!errorShown){close();toast(started?'چیزی نشنیدم؛ دوباره امتحان کن.':'میکروفون شروع نشد؛ مجوز سایت را بررسی کن.',5000)}};
     try{rec.start()}catch(e){close();toast('میکروفون در حال استفاده است؛ چند لحظه دیگر دوباره امتحان کن.',4500)}
   };
 }
@@ -403,7 +409,7 @@ function catView(){
 
 /* ================= backup / restore ================= */
 function doBackup(){
-  const data={app:'karnama',v:6,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN,study:STUDY,decision:DECISION,userMemory:USER_MEMORY,behavior:BEHAVIOR};
+  const data={app:'karnama',v:7,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN,study:STUDY,decision:DECISION,userMemory:USER_MEMORY,behavior:BEHAVIOR,advisorChat:S.advisorChat||[]};
   const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');
   const j=jparts(TODAY());
@@ -425,6 +431,7 @@ function doRestore(file){
       if(d.decision&&typeof d.decision==='object')restoreDecision(d.decision);
       if(d.userMemory&&typeof d.userMemory==='object')restoreUserMemory(d.userMemory);
       if(d.behavior&&typeof d.behavior==='object')restoreBehavior(d.behavior);
+      if(Array.isArray(d.advisorChat)){S.advisorChat=d.advisorChat.slice(-24);try{localStorage.setItem(ADVISOR_CHAT_KEY,JSON.stringify(S.advisorChat))}catch(e){}}
       save();S.cat=null;render();
       toast('بازیابی شد.',3000);
     }catch(e){toast('این فایل پشتیبانِ کارنما نیست.',3500)}
