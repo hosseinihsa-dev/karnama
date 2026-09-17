@@ -10,6 +10,7 @@ function taskCard(t,i){
 /* ================= render ================= */
 function render(){
   const today=TODAY();
+  captureMissedDeadlineBehaviors(S.tasks,today);
   const overdue=S.tasks.filter(t=>!t.rep&&!t.done&&t.date<today).sort(bySlot);
   const list=instOn(today);
   const doneN=list.filter(t=>t.done).length;
@@ -22,11 +23,11 @@ function render(){
       const id=+el.dataset.id,a=el.dataset.act;
       if(a==='toggle')toggle(id,el.dataset.date||TODAY());
       else if(a==='edit')openSheet(id);
-      else if(a==='today')patch(id,{date:TODAY()});
-      else if(a==='tomorrow')patch(id,{date:addDays(TODAY(),1),moved:(byId(id).moved||0)+1});
-      else if(a==='done')patch(id,{date:TODAY(),done:true});
+      else if(a==='today'){const t=byId(id),from=t&&t.date;if(t)recordTaskPostponedBehavior(t,from,TODAY(),'rescheduled');patch(id,{date:TODAY()})}
+      else if(a==='tomorrow'){const t=byId(id),to=addDays(TODAY(),1);if(t)recordTaskPostponedBehavior(t,t.date,to);patch(id,{date:to,moved:(byId(id).moved||0)+1})}
+      else if(a==='done'){const t=byId(id);if(t)recordTaskCompletedBehavior(t,TODAY());patch(id,{date:TODAY(),done:true})}
       else if(a==='drop')removeWithUndo(id);
-      else if(a==='allToday'){overdue.forEach(t=>t.date=TODAY());save();render()}
+      else if(a==='allToday'){overdue.forEach(t=>{recordTaskPostponedBehavior(t,t.date,TODAY(),'rescheduled');t.date=TODAY()});save();render()}
       else if(a==='sort'){S.sort=+el.dataset.v;render()}
       else if(a==='day'){S.day=el.dataset.v;render()}
       else if(a==='mon'){S.month=el.dataset.v;render()}
@@ -100,6 +101,7 @@ function decisionPanel(today){
   const x=chooseNextTask(S.tasks,today);
   if(!x)return `<section class="decision-card empty-decision"><div class="decision-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V18h8v-2.3A7 7 0 0 0 12 3m-3 18h6"/></svg><span>الان چیکار کنم؟</span></div><p>فعلاً کار مناسبی برای پیشنهاد ندارم. لازم نیست چیزی را تصادفی شروع کنی.</p></section>`;
   const t=x.task,key=decisionKey(t),when=t.time?` · ${fa(t.time)}`:'';
+  recordSuggestedBehavior(t,x);
   return `<section class="decision-card"><div class="decision-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V18h8v-2.3A7 7 0 0 0 12 3m-3 18h6"/></svg><span>الان چیکار کنم؟</span></div>
     <div class="decision-label">پیشنهاد کارنما</div><h2>${esc(t.title)}</h2>
     <div class="decision-meta"><span>${CATS[t.c].name}${when}</span>${x.duration?`<span>${fa(x.duration)} دقیقه</span>`:''}</div>
@@ -263,7 +265,7 @@ function catView(){
 
 /* ================= backup / restore ================= */
 function doBackup(){
-  const data={app:'karnama',v:5,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN,study:STUDY,decision:DECISION,userMemory:USER_MEMORY};
+  const data={app:'karnama',v:6,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN,study:STUDY,decision:DECISION,userMemory:USER_MEMORY,behavior:BEHAVIOR};
   const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');
   const j=jparts(TODAY());
@@ -284,6 +286,7 @@ function doRestore(file){
       if(Array.isArray(d.study)){STUDY=d.study;saveStudy()}
       if(d.decision&&typeof d.decision==='object')restoreDecision(d.decision);
       if(d.userMemory&&typeof d.userMemory==='object')restoreUserMemory(d.userMemory);
+      if(d.behavior&&typeof d.behavior==='object')restoreBehavior(d.behavior);
       save();S.cat=null;render();
       toast('بازیابی شد.',3000);
     }catch(e){toast('این فایل پشتیبانِ کارنما نیست.',3500)}
@@ -527,7 +530,8 @@ sb.onclick=()=>{
     const t=byId(S.edit);
     const changes={title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,meta:Object.assign({},t&&t.meta||{},g.meta||{},analyzed.meta||{})};
     if(duplicateOf(changes,S.edit)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
-    if(t)Object.assign(t,changes);
+    const oldDate=t&&t.date;if(t)Object.assign(t,changes);
+    if(t&&oldDate!==t.date)recordTaskPostponedBehavior(t,oldDate,t.date,t.date>oldDate?'postponed':'rescheduled');
     const question=t?detectImportantAmbiguity(t):null,entry=t&&question?registerClarificationQuestion(t,question):null;
     save();closeSheet();S.day=g.date;S.pv=null;S.edit=null;dr.value='';render();
     if(entry)setTimeout(()=>clarificationPicker(t,question,entry),80);else toast('تغییرات ذخیره شد.',2600);

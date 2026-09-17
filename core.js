@@ -366,8 +366,10 @@ const byId=id=>S.tasks.find(t=>t.id===id);
 function patch(id,ch){const t=byId(id);if(t)Object.assign(t,ch);save();render()}
 function toggle(id,k){
   const t=byId(id);if(!t)return;
-  if(t.rep){t.doneOn=t.doneOn||{};if(t.doneOn[k])delete t.doneOn[k];else t.doneOn[k]=1}
-  else t.done=!t.done;
+  let completed=false;
+  if(t.rep){t.doneOn=t.doneOn||{};if(t.doneOn[k])delete t.doneOn[k];else{t.doneOn[k]=1;completed=true}}
+  else {t.done=!t.done;completed=t.done}
+  if(completed&&typeof recordTaskCompletedBehavior==='function')recordTaskCompletedBehavior(t,k);
   save();render();
 }
 function remove(id){

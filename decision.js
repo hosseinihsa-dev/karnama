@@ -110,6 +110,7 @@ function evaluateDecisionTask(t,date=TODAY(),nowMin=decisionNowMinutes()){
   const context=contextPrioritySignals(t,date);score+=context.score;reasons.push(...context.reasons);
   const remembered=userMemorySignal(t,nowMin);
   if(remembered&&!remembered.hard){score+=remembered.score;reasons.push({w:remembered.score<0?45:65,text:`با توجه به شناخت قبلی: ${remembered.reason}`})}
+  const behavior=behaviorSignalForTask(t,nowMin);score+=behavior.score;reasons.push(...behavior.reasons);
   reasons.sort((a,b)=>b.w-a.w);
   const real=context.reasons.sort((a,b)=>b.w-a.w).slice(0,2);
   let reason=real.length?real.map(x=>x.text).join(' و '):(reasons[0]?reasons[0].text:'در میان کارهای باز، مناسب‌ترین گزینه فعلی است');
@@ -144,6 +145,7 @@ function recordDecisionEvent(kind,t,detail){
   if(DECISION.history.length>500)DECISION.history=DECISION.history.slice(-500);
   saveDecision();
   observeUserMemoryEvent(kind,t,detail||{});
+  recordDecisionBehavior(kind,t,detail||{});
 }
 
 function restoreDecision(data){
