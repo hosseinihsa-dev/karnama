@@ -7,10 +7,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="manifest.json?v=45">
-<link rel="apple-touch-icon" href="icon-192.png?v=45">
+<link rel="manifest" href="manifest.json?v=46">
+<link rel="apple-touch-icon" href="icon-192.png?v=46">
 <title>کارنما</title>
-<link rel="stylesheet" href="style.css?v=45">
+<link rel="stylesheet" href="style.css?v=46">
 </head>
 <body>
 
@@ -26,12 +26,10 @@
 
 <main><div id="view" class="col"></div></main>
 
-<button id="fab" aria-label="افزودن کار"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"/></svg></button>
-
 <nav>
   <button data-tab="0" class="on"><i></i><span>امروز</span></button>
   <button data-tab="1"><i></i><span>فردا</span></button>
-  <button data-tab="2"><i></i><span>هفته</span></button>
+  <button id="fab" aria-label="افزودن کار"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>کار تازه</span></button>
   <button data-tab="3"><i></i><span>ماه</span></button>
   <button data-tab="5"><i></i><span>مطالعه</span></button>
 </nav>
@@ -39,8 +37,9 @@
 <div id="side-menu" aria-hidden="true">
   <button class="side-scrim" aria-label="بستن منو"></button>
   <aside class="side-panel" aria-label="منوی کارنما">
-    <div class="side-head"><div class="side-brand"><img src="logo-karnama.png?v=45" alt=""><span><b>کارنما</b><small>نسخه ۴۵</small></span></div><button id="menu-close" aria-label="بستن منو">×</button></div>
+    <div class="side-head"><div class="side-brand"><img src="logo-karnama.png?v=46" alt=""><span><b>کارنما</b><small>نسخه ۴۶</small></span></div><button id="menu-close" aria-label="بستن منو">×</button></div>
     <button class="side-link" id="menu-categories"><svg viewBox="0 0 24 24" fill="none"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span><b>دسته‌ها</b><small>دیدن کارها بر اساس موضوع</small></span><i>‹</i></button>
+    <button class="side-link" id="menu-week"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/></svg><span><b>نمای هفته</b><small>مرور برنامه هفت‌روزه</small></span><i>‹</i></button>
     <button class="side-link" id="menu-planner"><svg viewBox="0 0 24 24" fill="none"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="9"/></svg><span><b>برنامه‌ی پیشنهادی امروز</b><small>کارهای امروز را ساعت‌بندی می‌کند</small></span><i>‹</i></button>
     <div class="side-section"><div class="side-title">پشتیبان‌گیری</div><p>یک نسخه از کارها و برنامه‌های مطالعه‌ات نگه دار.</p><div class="side-actions"><button id="side-backup">گرفتن فایل پشتیبان</button><button id="side-restore">بازیابی از فایل</button></div></div>
   </aside>
@@ -51,7 +50,7 @@
   <div id="sheet">
     <div class="grab"></div>
     <div class="sh-t" id="sh-title">چی تو ذهنته؟</div>
-    <textarea id="draft" rows="3" placeholder="مثلاً: هر ۸ ساعت قرص بخورم از ساعت ۸ صبح"></textarea>
+    <div class="draft-wrap"><textarea id="draft" rows="3" placeholder="مثلاً: فردا با آقای رضایی درباره قرارداد تماس بگیرم"></textarea><button id="voice-input" type="button" aria-label="ورود صوتی کار" title="ورود صوتی"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4m7-4a7 7 0 0 1-14 0m7 7v4m-4 0h8"/></svg></button></div>
     <div id="prev">
       <div class="pv-l">کارنما این‌طور فهمید — برای تغییر، روی هرکدام بزن</div>
       <div class="chips" id="pvchips"></div>
@@ -88,9 +87,9 @@
 <input type="file" id="imp" accept="application/json,.json" style="display:none">
 <div id="toast"></div>
 
-<script src="core.js?v=45"></script>
-<script src="study.js?v=45"></script>
-<script src="decision.js?v=45"></script>
-<script src="views.js?v=45"></script>
+<script src="core.js?v=46"></script>
+<script src="study.js?v=46"></script>
+<script src="decision.js?v=46"></script>
+<script src="views.js?v=46"></script>
 </body>
 </html>

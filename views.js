@@ -102,7 +102,7 @@ function decisionPanel(today){
   const t=x.task,key=decisionKey(t),when=t.time?` · ${fa(t.time)}`:'';
   return `<section class="decision-card"><div class="decision-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V18h8v-2.3A7 7 0 0 0 12 3m-3 18h6"/></svg><span>الان چیکار کنم؟</span></div>
     <div class="decision-label">پیشنهاد کارنما</div><h2>${esc(t.title)}</h2>
-    <div class="decision-meta"><span>${CATS[t.c].name}${when}</span><span>حدود ${fa(x.duration)} دقیقه</span></div>
+    <div class="decision-meta"><span>${CATS[t.c].name}${when}</span>${x.duration?`<span>${fa(x.duration)} دقیقه</span>`:''}</div>
     <p class="decision-reason">${esc(x.reason)}</p>
     <div class="decision-actions"><button class="decision-later" data-act="decisionReject" data-id="${t.id}" data-key="${esc(key)}">الان نمی‌تونم</button><button class="decision-start" data-act="decisionStart" data-id="${t.id}" data-key="${esc(key)}">شروع می‌کنم</button></div>
   </section>`;
@@ -112,8 +112,12 @@ function decisionRejectPicker(id,key){
   const t=decisionCandidates(S.tasks,TODAY()).find(x=>x.id===id&&decisionKey(x)===key)||byId(id);if(!t)return;
   pk.classList.remove('cat-mode');pkbx.classList.remove('cat-mode');
   const reasons=[['no-time','وقت ندارم'],['no-energy','انرژی ندارم'],['blocked','شرایطش فراهم نیست'],['other','دلیل دیگر']];
-  pkbx.innerHTML=`<h4>چرا الان نمی‌تونی؟</h4><div class="decision-reject-note">فقط برای بهترشدن پیشنهادهای بعدی ذخیره می‌شود.</div>`+reasons.map((r,i)=>`<button class="op" data-i="${i}">${r[1]}</button>`).join('');
-  pkbx.querySelectorAll('.op').forEach((b,i)=>b.onclick=()=>{recordDecisionEvent('reject',t,reasons[i][0]);pk.classList.remove('show');render();toast('متوجه شدم؛ یک گزینه مناسب‌تر بررسی کردم.',2600)});
+  pkbx.innerHTML=`<h4>چرا الان نمی‌تونی؟</h4><div class="decision-reject-note">این بازخورد فقط برای بهترشدن پیشنهادهای بعدی روی همین دستگاه ذخیره می‌شود.</div>`+
+    reasons.map((r,i)=>`<button class="op" data-i="${i}">${r[1]}</button>`).join('')+
+    `<div class="decision-custom"><label for="decision-own-reason">دلیل خودم <span>اختیاری</span></label><textarea id="decision-own-reason" rows="3" placeholder="مثلاً: آتلیه الان بسته است"></textarea><button data-own-reason="1">ثبت دلیل من</button></div>`;
+  const finish=(code,text='')=>{recordDecisionEvent('reject',t,{code,text:text.trim()||null});pk.classList.remove('show');render();toast('متوجه شدم؛ پیشنهاد بعدی را با این بازخورد بررسی کردم.',2800)};
+  pkbx.querySelectorAll('.op').forEach((b,i)=>b.onclick=()=>finish(reasons[i][0]));
+  pkbx.querySelector('[data-own-reason]').onclick=()=>{const input=pkbx.querySelector('#decision-own-reason');if(!input.value.trim()){toast('اگر خواستی دلیل خودت را بنویس؛ یا یکی از گزینه‌های بالا را بزن.',3000);input.focus();return}finish('custom',input.value)};
   pk.classList.add('show');
 }
 
@@ -258,7 +262,7 @@ function catView(){
 
 /* ================= backup / restore ================= */
 function doBackup(){
-  const data={app:'karnama',v:3,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN,study:STUDY,decision:DECISION};
+  const data={app:'karnama',v:4,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN,study:STUDY,decision:DECISION};
   const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');
   const j=jparts(TODAY());
@@ -338,6 +342,25 @@ function updatePv(){
   };
 }
 dr.addEventListener('input',()=>updatePv());
+
+/* ورود صوتی فقط متن را پر می‌کند؛ تحلیل و ذخیره دقیقاً همان مسیر ورود متنی است. */
+const mic=document.getElementById('voice-input');
+if(mic){
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SpeechRecognition){mic.classList.add('unsupported');mic.title='تشخیص گفتار در این مرورگر پشتیبانی نمی‌شود'}
+  else{
+    let rec=null;
+    mic.onclick=()=>{
+      if(rec){try{rec.stop()}catch(e){}return}
+      rec=new SpeechRecognition();rec.lang='fa-IR';rec.interimResults=false;rec.maxAlternatives=1;
+      mic.classList.add('listening');mic.setAttribute('aria-label','پایان ورود صوتی');
+      rec.onresult=e=>{const text=e.results&&e.results[0]&&e.results[0][0]&&e.results[0][0].transcript;if(text){dr.value=(dr.value.trim()?dr.value.trim()+' ': '')+text.trim();updatePv()}};
+      rec.onerror=e=>{if(e.error!=='aborted')toast(e.error==='not-allowed'?'اجازه میکروفون داده نشد؛ همچنان می‌توانی تایپ کنی.':'صدا تشخیص داده نشد؛ دوباره امتحان کن یا تایپ کن.',3500)};
+      rec.onend=()=>{rec=null;mic.classList.remove('listening');mic.setAttribute('aria-label','ورود صوتی کار')};
+      try{rec.start()}catch(e){rec=null;mic.classList.remove('listening');toast('میکروفون شروع نشد؛ ورود متنی همچنان در دسترس است.',3500)}
+    };
+  }
+}
 
 /* --- picker --- */
 const pk=document.getElementById('pick'),pkbx=pk.querySelector('.bx');
@@ -487,7 +510,7 @@ document.getElementById('sh-del').onclick=()=>{
   const id=S.edit;S.edit=null;closeSheet();removeWithUndo(id);
 };
 
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===2)S.day=TODAY();if(S.tab===3){S.month=TODAY();S.day=TODAY()}if(S.tab===4)S.cat=null;render()});
+document.querySelectorAll('nav button[data-tab]').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===2)S.day=TODAY();if(S.tab===3){S.month=TODAY();S.day=TODAY()}if(S.tab===4)S.cat=null;render()});
 
 const sideMenu=document.getElementById('side-menu'),menuBtn=document.getElementById('menu-btn');
 function openMenu(){sideMenu.classList.add('show');sideMenu.setAttribute('aria-hidden','false');menuBtn.setAttribute('aria-expanded','true');document.body.classList.add('menu-open')}
@@ -496,6 +519,7 @@ menuBtn.onclick=openMenu;
 document.getElementById('menu-close').onclick=closeMenu;
 sideMenu.querySelector('.side-scrim').onclick=closeMenu;
 document.getElementById('menu-categories').onclick=()=>{S.tab=4;S.cat=null;closeMenu();render()};
+document.getElementById('menu-week').onclick=()=>{S.tab=2;S.day=TODAY();closeMenu();render()};
 document.getElementById('menu-planner').onclick=()=>{S.tab=6;S.planPreview=true;closeMenu();render()};
 document.getElementById('side-backup').onclick=()=>{closeMenu();doBackup()};
 document.getElementById('side-restore').onclick=()=>{closeMenu();if(impEl)impEl.click()};

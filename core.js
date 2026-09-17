@@ -264,7 +264,8 @@ function classify(text){
         if(n>0)until=addDays(today,um[2]==='روز'?n:um[2]==='هفته'?n*7:n*30);}
     }
   }
-  const explicitDuration=/(نیم|ربع|یک|دو|سه|چهار|پنج|شش|[\d۰-۹]+)\s*(ساعت|دقیقه|دقه)/.test(t);
+  const durationText=t.replace(/هر\s*[\d۰-۹]+\s*ساعت/g,' ');
+  const explicitDuration=/(نیم|ربع|یک|دو|سه|چهار|پنج|شش|[\d۰-۹]+)\s*(ساعت|دقیقه|دقه)/.test(durationText);
   const meta={};
   if(explicitDuration)meta.durationMin=taskDuration({title:t,note:t,c});
   if(/خیلی\s*مهم|مهمه|ضروری/.test(t)){meta.importance='high';meta.importanceReason='در توضیح کار مهم معرفی شده'}
@@ -282,7 +283,15 @@ const T_WORDS=['پس فردا','پس‌فردا','امروز','فردا','امش
   'خیلی فوری','فوری','خیلی مهم','مهمه','ددلاین','سریع','حتما','حتماً',
   'شنبه','یکشنبه','یک شنبه','دوشنبه','دو شنبه','سه‌شنبه','سه شنبه','چهارشنبه','چهار شنبه','پنجشنبه','پنج‌شنبه','پنج شنبه','جمعه'];
 function titleFrom(text){
-  let t=(text||'').replace(/\s+/g,' ').trim();
+  const raw=(text||'').replace(/\s+/g,' ').trim();
+  const person=raw.match(/(?:با\s+)?((?:آقای|خانم|دکتر|مهندس|استاد)\s+[آ-ی‌]+)/);
+  if(person&&/تماس|زنگ/.test(raw)){
+    let topic=(raw.match(/(?:درباره|راجع\s*به)\s+(.+)/)||[])[1]||'';
+    topic=topic.replace(/\s+(?:صحبت|هماهنگ|سؤال|سوال|پرس‌وجو)\s*(?:کنم|بکنم|داشته باشم)?\s*$/,'').replace(/^(?:مبلغ\s+نهایی\s+|موضوع\s+)/,'').trim();
+    topic=topic.split(' ').slice(0,4).join(' ');
+    return `تماس با ${person[1]}${topic?' درباره '+topic:''}`;
+  }
+  let t=raw;
   T_KILL.forEach(r=>{t=t.replace(r,'')});
   t=t.replace(/(^|\s)(یادم\s*(?:بنداز|بیار)(?:\s*که)?|یادآوریم\s*کن(?:\s*که)?|یادآوری\s*کن(?:\s*که)?)(?=\s|$)/g,' ');
   t=t.replace(/ساعت\s*[\d۰-۹]+([:.٫][\d۰-۹]+)?/g,' ');
