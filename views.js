@@ -157,16 +157,25 @@ function decisionRejectPicker(id,key){
   const t=decisionCandidates(S.tab===0?advisorTaskPool():S.tasks,TODAY()).find(x=>x.id===id&&decisionKey(x)===key)||byId(id);if(!t)return;
   pk._onDismiss=null;pk.classList.remove('cat-mode');pkbx.classList.remove('cat-mode','memory-box');
   const finish=()=>{pk.classList.remove('show');save();render()};
-  const schedule=()=>{
-    pkbx.innerHTML=`<h4>چه زمانی دوباره یادآوری کنم؟</h4><div class="time-exact"><label>روز یادآوری<input id="defer-date" type="date" min="${TODAY()}" value="${addDays(TODAY(),1)}"></label><label>ساعت دقیق<input id="defer-time" type="time" step="60" value="09:00"></label><p class="decision-reject-note">در نسخه وب، یادآوری هنگام بازبودن کارنما نمایش داده می‌شود؛ با بازکردن دوباره هم موعدهای رسیده را می‌بینی.</p><button class="b-gold" id="defer-save">ثبت زمان یادآوری</button></div>`;
-    pkbx.querySelector('#defer-save').onclick=()=>{const date=pkbx.querySelector('#defer-date').value,time=pkbx.querySelector('#defer-time').value;if(!date||!time||new Date(date+'T'+time)<=new Date()){toast('یک زمان آینده انتخاب کن.',3000);return}recordDecisionEvent('reject',t,{code:'no-time',date,time});postponeSuggestedTask(t,date,time);finish();toast('زمان جدید و یادآوری ثبت شد.',3000)};
+  let deferDate=addDays(TODAY(),1),deferTime='09:00';
+  const schedule=(anchor=deferDate)=>{
+    const parts=jparts(anchor),first=addDays(anchor,1-parts.d),last=endOfJMonth(anchor),selectedLabel=fa(WD[wdIndex(deferDate)]+' '+jdate(deferDate));
+    let calendar='<div class="mgrid">'+WDS.map(w=>'<div class="mwd">'+w+'</div>').join('');
+    for(let i=0;i<wdIndex(first);i++)calendar+='<div class="mcell blank"></div>';
+    for(let day=first;day<=last;day=addDays(day,1))calendar+=`<button class="mcell ${day===deferDate?'on':''}" data-defer-day="${day}" aria-label="${fa(WD[wdIndex(day)]+' '+jdate(day))}" ${day<TODAY()?'disabled':''}>${fa(jparts(day).d)}</button>`;
+    calendar+='</div>';
+    pkbx.innerHTML=`<h4>چه زمانی دوباره یادآوری کنم؟</h4><p class="defer-selected">${selectedLabel}</p><div class="date-quick"><button data-defer-day="${TODAY()}">امروز</button><button data-defer-day="${addDays(TODAY(),1)}">فردا</button></div><div class="mhead"><button class="mnav" data-defer-month="${addDays(first,-1)}" aria-label="ماه قبل">›</button><b>${JM[parts.m-1]}</b><button class="mnav" data-defer-month="${addDays(last,1)}" aria-label="ماه بعد">‹</button></div>${calendar}<div class="time-exact"><label>ساعت دقیق<input id="defer-time" type="time" step="60" value="${deferTime}"></label><p class="decision-reject-note">در نسخه وب، یادآوری هنگام بازبودن کارنما نمایش داده می‌شود؛ با بازکردن دوباره هم موعدهای رسیده را می‌بینی.</p><button class="b-gold" id="defer-save">ثبت زمان یادآوری</button></div>`;
+    pkbx.querySelector('#defer-time').onchange=e=>{deferTime=e.target.value};
+    pkbx.querySelectorAll('[data-defer-day]').forEach(b=>b.onclick=()=>{deferDate=b.dataset.deferDay;schedule(deferDate)});
+    pkbx.querySelectorAll('[data-defer-month]').forEach(b=>b.onclick=()=>schedule(b.dataset.deferMonth));
+    pkbx.querySelector('#defer-save').onclick=()=>{const date=deferDate,time=pkbx.querySelector('#defer-time').value;if(!date||!time||new Date(date+'T'+time)<=new Date()){toast('یک زمان آینده انتخاب کن.',3000);return}recordDecisionEvent('reject',t,{code:'no-time',date,time});postponeSuggestedTask(t,date,time);finish();toast('یادآوری برای '+selectedLabel+' ساعت '+fa(time)+' ثبت شد.',4000)};
   };
   const prerequisite=()=>{
     pkbx.innerHTML='<h4>اول چه کاری باید انجام شود؟</h4><div class="decision-custom"><label for="prerequisite-text">پیش‌نیاز را طبیعی توضیح بده</label><textarea id="prerequisite-text" placeholder="مثلاً اول باید فایل‌ها را از مرتضی بگیرم"></textarea><button id="prerequisite-save">ساخت پیش‌نیاز و تغییر پیشنهاد</button></div>';
     pkbx.querySelector('#prerequisite-save').onclick=()=>{const text=pkbx.querySelector('#prerequisite-text').value.trim();if(text.length<3){toast('پیش‌نیاز را بنویس.',2500);return}const base=byId(t.id);if(!base){toast('پیش‌نیاز برای کارهای عادی قابل ثبت است.',3000);return}const parsed=classify(text),title=titleFrom(text.replace(/^اول\s+(?:باید\s+)?/,''));let task=S.tasks.find(x=>!x.done&&x.id!==base.id&&norm(x.title)===norm(title));if(!task){task={id:Date.now(),title,note:text,c:parsed.c===11?12:parsed.c,p:0,s:parsed.s,date:TODAY(),time:parsed.time,done:false,rep:null,meta:parsed.meta};if(task.meta.context)task.meta.context.prerequisite=null;S.tasks.push(task)}setExplicitTaskPriority(task,'پیش‌نیاز کار «'+base.title+'»');base.meta=Object.assign({},base.meta||{},{prerequisiteTaskId:task.id});recordDecisionEvent('reject',t,{code:'blocked',text,prerequisiteTaskId:task.id});finish();toast('پیش‌نیاز ساخته شد؛ کار اصلی تا انجام آن کنار گذاشته شد.',4000)};
   };
   pkbx.innerHTML='<h4>چرا الآن نمی‌تونی؟</h4><button class="op" id="reject-time">زمان دیگری انجام می‌دهم</button><button class="op" id="reject-prerequisite">اول یک کار دیگر لازم است</button><button class="op" id="reject-energy">انرژی ندارم؛ فردا</button>';
-  pkbx.querySelector('#reject-time').onclick=schedule;pkbx.querySelector('#reject-prerequisite').onclick=prerequisite;
+  pkbx.querySelector('#reject-time').onclick=()=>schedule();pkbx.querySelector('#reject-prerequisite').onclick=prerequisite;
   pkbx.querySelector('#reject-energy').onclick=()=>{recordDecisionEvent('reject',t,{code:'no-energy'});postponeSuggestedTask(t,addDays(TODAY(),1),'09:00');finish();toast('برای فردا ساعت ۹ گذاشتم.',3000)};
   pk.classList.add('show');
 }
