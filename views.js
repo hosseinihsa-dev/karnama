@@ -148,7 +148,7 @@ function decisionPanel(today,x=chooseNextTask(S.tasks,today),advisor=false){
 }
 
 function postponeSuggestedTask(t,date,time){
-  let base=byId(t.id);if(!base)return null;
+  let base=byId(t.id);if(!base&&t.meta&&t.meta.advisorStudy){base=Object.assign({},t,{id:Date.now(),date,time,done:false,meta:Object.assign({},t.meta)});S.tasks.push(base)}if(!base)return null;
   if(base.rep){base.skippedOn=base.skippedOn||{};base.skippedOn[t.key||TODAY()]=1;const copy=Object.assign({},base,{id:Date.now(),rep:null,every:null,until:null,done:false,date,time,meta:Object.assign({},base.meta||{},{postponedFrom:decisionKey(t)})});delete copy.doneOn;delete copy.skippedOn;S.tasks.push(copy);base=copy}
   else{recordTaskPostponedBehavior(base,base.date,date);base.date=date;base.time=time}
   base.date=date;base.time=time;base.s=time?slotOfTime(time):base.s;base.rem=true;base.meta=Object.assign({},base.meta||{},{reminderAt:date+(time?'T'+time: 'T09:00'),reminderShown:false});save();return base;
