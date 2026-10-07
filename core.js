@@ -118,7 +118,7 @@ const clock=m=>fa(`${String(Math.floor(m/60)%24).padStart(2,'0')}:${String(m%60)
 function dailyPlan(list,fromMin){
   /* by default nothing is scheduled into the past: start from the current clock */
   if(fromMin===undefined){const n=new Date();fromMin=n.getHours()*60+n.getMinutes()}
-  const active=list.filter(t=>!t.done),out=[],busy=[];
+  const active=list.filter(t=>!t.done&&(typeof graphReadiness!=='function'||!graphReadiness(t).blocked)),out=[],busy=[];
   active.filter(t=>t.time).forEach(t=>{
     const start=tmin(t),duration=taskDuration(t),end=start+duration;
     out.push({t,start,end,duration,fixed:true,overflow:false});busy.push([start,end]);
@@ -352,6 +352,8 @@ function titleFrom(text){
 const catChip=t=>`<span class="chip" style="color:${col(CATS[t.c].h)};background:${col(CATS[t.c].h,.13)}"><span class="d5" style="background:${col(CATS[t.c].h)}"></span>${CATS[t.c].name}</span>`;
 function taskChips(t){
   let h=catChip(t)+`<span class="chip c-nu">${t.time?fa(t.time):SLOTS[t.s]}</span>`;
+  if(typeof domainChip==='function')h+=domainChip(t);
+  if(typeof graphReadiness==='function'&&graphReadiness(t).blocked)h+=`<span class="chip c-nu">${esc(graphReadiness(t).reason)}</span>`;
   if(t.rep)h+=`<span class="chip c-inf">${repLabel(t)}${t.until?' تا '+fa(jdate(t.until)):''}</span>`;
   if(t.rem)h+=`<span class="chip c-rem">یادآور</span>`;
   return h;

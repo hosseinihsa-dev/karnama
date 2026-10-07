@@ -23,6 +23,7 @@ function assessNowFeasibility(t,{date=TODAY(),nowMin=decisionNowMinutes()}={}){
   const text=decisionText(t),hour=nowMin/60,unusualNight=hour<7||hour>=22;
   const result=(status,reason,source,confidence)=>({status,reason,source,confidence,date,nowMin});
   const explicit=t.time?tmin(t):null;
+  if(typeof graphReadiness==='function'){const graph=graphReadiness(t,date);if(graph.blocked)return result(FEASIBLE_NOW.NO,graph.reason,'task-graph-'+graph.kind,1)}
   const prerequisiteId=decisionMeta(t).prerequisiteTaskId;
   if(prerequisiteId){const prerequisite=S.tasks.find(x=>x.id===prerequisiteId);if(prerequisite&&!prerequisite.done)return result(FEASIBLE_NOW.NO,'اول باید کار پیش‌نیاز انجام شود','linked-prerequisite',1)}
 
@@ -53,7 +54,7 @@ function assessNowFeasibility(t,{date=TODAY(),nowMin=decisionNowMinutes()}={}){
   return result(FEASIBLE_NOW.UNKNOWN,'اطلاعات کافی برای تشخیص قطعی امکان انجام وجود ندارد','insufficient-data',.3);
 }
 
-const decisionFingerprint=t=>JSON.stringify([t.title||'',t.note||'',t.date||'',t.time||'',t.s,t.p,t.c,taskContext(t)||null,decisionMeta(t).prerequisiteTaskId?!!(S.tasks.find(x=>x.id===decisionMeta(t).prerequisiteTaskId)||{}).done:null]);
+const decisionFingerprint=t=>JSON.stringify([t.title||'',t.note||'',t.date||'',t.time||'',t.s,t.p,t.c,taskContext(t)||null,decisionMeta(t).prerequisiteTaskId?!!(S.tasks.find(x=>x.id===decisionMeta(t).prerequisiteTaskId)||{}).done:null,typeof graphReadiness==='function'?graphReadiness(t):null]);
 function recentDecisionRejections(date=TODAY()){
   const map=new Map();DECISION.feedback.forEach(x=>{if(x&&x.date===date&&x.kind==='reject'&&x.taskKey)map.set(x.taskKey,x.fingerprint||null)});return map;
 }
@@ -153,6 +154,7 @@ function chooseNextTask(tasks,date=TODAY(),nowMin=decisionNowMinutes()){
   const pool=groups.available.length?groups.available:groups.unknown;
   const ranked=pool.map(x=>Object.assign(evaluateDecisionTask(x.task,date,nowMin),{feasibility:x.feasibility}))
     .sort((a,b)=>b.trace.urgency.level-a.trace.urgency.level||b.trace.impact.level-a.trace.impact.level||Number(!!decisionMeta(b.task).explicitPriority)-Number(!!decisionMeta(a.task).explicitPriority)||b.trace.urgency.weight-a.trace.urgency.weight||b.trace.impact.weight-a.trace.impact.weight||b.trace.manual.level-a.trace.manual.level||b.trace.personal.score-a.trace.personal.score||((a.duration||Infinity)-(b.duration||Infinity))||(a.task.id-b.task.id));
+  if(typeof domainPreference==='function')ranked.sort((a,b)=>b.trace.urgency.level-a.trace.urgency.level||b.trace.impact.level-a.trace.impact.level||domainPreference(b.task,date,nowMin)-domainPreference(a.task,date,nowMin));
   const spoken=ranked.filter(x=>{const p=decisionMeta(x.task).explicitPriority;return p&&p.level==='high'}).sort((a,b)=>String(decisionMeta(b.task).explicitPriority.at||'').localeCompare(String(decisionMeta(a.task).explicitPriority.at||'')))[0];
   if(spoken&&ranked[0]!==spoken&&ranked[0].trace.urgency.level<5&&ranked[0].trace.impact.level<4){ranked.splice(ranked.indexOf(spoken),1);ranked.unshift(spoken)}
   const top=ranked[0];if(!top)return null;const runner=ranked[1];let confidence='medium';

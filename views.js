@@ -28,7 +28,7 @@ function render(){
   const greetEl=document.getElementById('greet'),subEl=document.getElementById('sub');if(greetEl)greetEl.textContent=S.tab===0?'کارنما':S.tab===7?'کارها':'سلام! امروز مال توست';if(subEl)subEl.textContent=S.tab===0?fa(`${WD[wdIndex(today)]} ${jdate(today)}`):fa(`${list.length} کار برای امروز · ${doneN} انجام شده`);
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',+b.dataset.tab===S.tab));
   const v=document.getElementById('view');
-  const pages={0:advisorHome,1:tomorrowView,2:weekView,3:monthView,4:catView,5:studyView,6:plannerPage,7:tasksView};
+  const pages={0:advisorHome,1:tomorrowView,2:weekView,3:monthView,4:catView,5:studyView,6:plannerPage,7:tasksView,8:graphView};
   v.innerHTML=(pages[S.tab]||advisorHome)(overdue,list,doneN,today);
   v.querySelectorAll('[data-act]').forEach(el=>{
     el.onclick=()=>{
@@ -45,6 +45,8 @@ function render(){
       else if(a==='mon'){S.month=el.dataset.v;render()}
       else if(a==='cat'){S.cat=el.dataset.v===''?null:+el.dataset.v;render()}
       else if(a==='backup')doBackup();
+      else if(a==='graphImport')document.getElementById('graph-imp').click();
+      else if(a==='graphResolve')resolveGraphWait(id);
       else if(a==='restore'){const i=document.getElementById('imp');if(i)i.click()}
       else if(a==='studyAdd')openStudySheet();
       else if(a==='studyEdit')editStudySheet(id);
@@ -71,7 +73,7 @@ function render(){
 function advisorHome(overdue,list,doneN,today){
   const x=chooseAdvisorTask(today);
   if(x)recordSuggestedBehavior(x.task,x);
-  const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2><p>${esc(x.reason)}</p><div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionDone" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">✓ انجام شد</button></div></div>`:`<div class="advisor-proposal empty"><h2>فعلاً پیشنهاد مشخصی ندارم</h2><p>با دکمه زیر یک کار تازه اضافه کن.</p></div>`;
+  const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2>${domainChip(x.task)}<p>${esc(x.reason)}</p><div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionDone" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">✓ انجام شد</button></div></div>`:`<div class="advisor-proposal empty"><h2>فعلاً پیشنهاد مشخصی ندارم</h2><p>با دکمه زیر یک کار تازه اضافه کن.</p></div>`;
   return `<section class="coach-home"><div class="coach-orb"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 7c6 0 10 3 13 8 3-5 7-8 13-8v7c-6 0-9 4-9 10v10h-8V24c0-6-3-10-9-10z"/></svg></div><h2 class="coach-question">قدم بعدی امروز</h2>${proposal}<button class="home-add-task" data-act="addTask" data-id="0"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>افزودن کار</span></button></section>`;
 }
 
@@ -181,7 +183,7 @@ function decisionRejectPicker(id,key){
   pk.classList.add('show');
 }
 function checkTaskReminders(){
-  const now=new Date();for(const task of S.tasks){const meta=task.meta||{};if(!task.done&&meta.reminderAt&&!meta.reminderShown&&new Date(meta.reminderAt)<=now){meta.reminderShown=true;save();toast('وقت انجام «'+task.title+'» رسیده است.',7000);if(window.Notification&&Notification.permission==='granted')navigator.serviceWorker.ready.then(r=>r.showNotification('کارنما',{body:task.title,tag:'task-'+task.id})).catch(()=>{});render();break}}
+  const now=new Date();for(const task of S.tasks){const meta=task.meta||{};if(!task.done&&!graphReadiness(task).blocked&&meta.reminderAt&&!meta.reminderShown&&new Date(meta.reminderAt)<=now){meta.reminderShown=true;save();toast('وقت انجام «'+task.title+'» رسیده است.',7000);if(window.Notification&&Notification.permission==='granted')navigator.serviceWorker.ready.then(r=>r.showNotification('کارنما',{body:task.title,tag:'task-'+task.id})).catch(()=>{});render();break}}
 }
 setInterval(checkTaskReminders,30000);setTimeout(checkTaskReminders,1500);
 function advisorNextText(){const n=chooseAdvisorTask();return n?`پیشنهاد بعدی من «${n.task.title}» است؛ ${n.reason}.`:'فعلاً کار مشخص دیگری ندارم که با اطمینان پیشنهاد بدهم.'}
@@ -465,6 +467,7 @@ function doRestore(file){
 }
 const impEl=document.getElementById('imp');
 if(impEl)impEl.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)doRestore(f);e.target.value=''};
+document.getElementById('graph-imp').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=JSON.parse(await f.text());const result=importTaskGraph(data);S.tab=8;render();toast(fa(`${result.added} کار اضافه شد؛ ${result.matched} کار موجود حفظ و مرتبط شد.`),4500)}catch(err){toast(err.message||'ورود فایل انجام نشد؛ داده‌های قبلی حفظ شدند.',4500)}};
 
 /* ================= capture sheet ================= */
 const ov=document.getElementById('ov'),dr=document.getElementById('draft'),
@@ -479,7 +482,7 @@ function openSheet(id){
   if(t){dr.value=t.note||t.title;
     const auto=titleFrom(t.note||t.title);
     S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,every:t.every||null,until:t.until||null,date:t.date,time:t.time||null,
-          title:t.title,titleManual:t.title!==auto,touched:true};}
+          title:t.title,titleManual:t.title!==auto,touched:true,domain:t.meta?.domain||null};}
   else {dr.value='';S.pv=null}
   updatePv();ov.classList.add('show');setTimeout(()=>dr.focus(),60);
 }
@@ -505,6 +508,7 @@ function updatePv(){
     `<button class="chip c-nu" data-f="s">${SLOTS[g.s]}</button>`+
     `<button class="chip c-nu" data-f="time">${g.time?fa(g.time):'بدون ساعت'}</button>`+
     `<button class="chip c-nu" data-f="p">${PRI[g.p]}</button>`+
+    `<button class="chip c-nu" data-f="domain">${TASK_DOMAINS[g.domain]?.label||'محل کار / خانه / شخصی'}</button>`+
     `<button class="chip c-inf" data-f="rep">${g.rep?repLabel(g):'بدون تکرار'}</button>`+
     (g.rep?`<button class="chip c-inf" data-f="until">${g.until?'تا '+fa(jdate(g.until)):'بدون پایان'}</button>`:'');
   pc.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>picker(b.dataset.f));
@@ -541,6 +545,7 @@ if(mic){
 const pk=document.getElementById('pick'),pkbx=pk.querySelector('.bx');
 pk.querySelector('.bd').onclick=()=>{if(typeof pk._onDismiss==='function')pk._onDismiss();pk._onDismiss=null;pk.classList.remove('show');pkbx.classList.remove('memory-box')};
 function picker(f){
+  if(f==='domain'){pkbx.innerHTML='<h4>این کار مربوط به کدام بخش است؟</h4>'+Object.entries(TASK_DOMAINS).map(([d,x])=>`<button class="op" data-domain="${d}">${x.icon} ${x.label}</button>`).join('');pk.classList.add('show');pkbx.querySelectorAll('[data-domain]').forEach(b=>b.onclick=()=>{S.pv.domain=b.dataset.domain;S.pv.touched=true;pk.classList.remove('show');updatePv()});return}
   pk._onDismiss=null;
   pkbx.classList.remove('memory-box');
   const g=S.pv,today=TODAY();
@@ -700,7 +705,8 @@ sb.onclick=()=>{
     const t=byId(S.edit);
     const changes={title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,meta:Object.assign({},t&&t.meta||{},g.meta||{},analyzed.meta||{})};
     if(duplicateOf(changes,S.edit)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
-    const oldDate=t&&t.date;if(t)Object.assign(t,changes);
+    if(g.domain)changes.meta.domain=g.domain;
+    const oldDate=t&&t.date;if(t){Object.assign(t,changes);if(t.meta.graphSource&&oldDate!==t.date)t.meta.notBefore=t.date;}
     if(t&&oldDate!==t.date)recordTaskPostponedBehavior(t,oldDate,t.date,t.date>oldDate?'postponed':'rescheduled');
     const question=t?detectImportantAmbiguity(t):null,entry=t&&question?registerClarificationQuestion(t,question):null;
     save();closeSheet();S.day=g.date;S.pv=null;S.edit=null;dr.value='';render();
@@ -709,6 +715,7 @@ sb.onclick=()=>{
   }
   const newTask={id:Date.now(),title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0,meta:Object.assign({},g.meta||{},analyzed.meta||{})};
   if(duplicateOf(newTask)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
+  if(g.domain)newTask.meta.domain=g.domain;
   S.tasks.push(newTask);
   const question=detectImportantAmbiguity(newTask),entry=question?registerClarificationQuestion(newTask,question):null;
   save();closeSheet();S.tab=0;S.day=g.date;S.pv=null;dr.value='';render();
@@ -738,6 +745,7 @@ document.getElementById('menu-week').onclick=()=>{S.tab=7;S.taskMode='dates';S.d
 document.getElementById('menu-planner').onclick=()=>{S.tab=6;S.planPreview=true;closeMenu();render()};
 document.getElementById('menu-memory').onclick=()=>{closeMenu();userMemoryPicker()};
 document.getElementById('side-backup').onclick=()=>{closeMenu();doBackup()};
+document.getElementById('menu-graph').onclick=()=>{closeMenu();S.tab=8;render()};
 document.getElementById('side-restore').onclick=()=>{closeMenu();if(impEl)impEl.click()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sideMenu.classList.contains('show'))closeMenu()});
 
