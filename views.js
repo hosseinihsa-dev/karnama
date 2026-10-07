@@ -43,7 +43,7 @@ function render(){
       else if(a==='sort'){S.sort=+el.dataset.v;render()}
       else if(a==='day'){S.day=el.dataset.v;render()}
       else if(a==='mon'){S.month=el.dataset.v;render()}
-      else if(a==='cat'){S.cat=el.dataset.v===''?null:+el.dataset.v;render()}
+      else if(a==='cat'){S.cat=el.dataset.v===''?null:el.dataset.v;render()}
       else if(a==='backup')doBackup();
       else if(a==='graphImport')document.getElementById('graph-imp').click();
       else if(a==='graphResolve')resolveGraphWait(id);
@@ -123,7 +123,7 @@ function todayView(overdue,list,doneN,today){
              bySlot,
              (a,b)=>(a.done-b.done)||(a.c-b.c)||(a.s-b.s)||(a.p-b.p)][S.sort];
   const sorted=[...list].sort(cmp);
-  const gk=t=>S.sort===1?SLOTS[t.s]:S.sort===2?CATS[t.c].name:'';
+  const gk=t=>S.sort===1?SLOTS[t.s]:S.sort===2?taskDomainLabel(t):'';
   const gc={};sorted.forEach(t=>{gc[gk(t)]=(gc[gk(t)]||0)+1});
   let lh='';
   sorted.forEach((t,i)=>{
@@ -142,7 +142,7 @@ function decisionPanel(today,x=chooseNextTask(S.tasks,today),advisor=false){
   recordSuggestedBehavior(t,x);
   return `<section class="decision-card ${advisor?'advisor-decision':''}"><div class="decision-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V18h8v-2.3A7 7 0 0 0 12 3m-3 18h6"/></svg><span>${advisor?'پیشنهاد من برای الآن':'الان چیکار کنم؟'}</span></div>
     <div class="decision-label">${advisor?'به نظرم الآن بهتره روی این تمرکز کنی':'پیشنهاد کارنما'}</div><h2>${esc(t.title)}</h2>
-    <div class="decision-meta"><span>${CATS[t.c].name}${when}</span>${x.duration?`<span>${fa(x.duration)} دقیقه</span>`:''}</div>
+    <div class="decision-meta"><span>${taskDomainLabel(t)}${when}</span>${x.duration?`<span>${fa(x.duration)} دقیقه</span>`:''}</div>
     <p class="decision-reason">${esc(x.reason)}</p>
     <div class="decision-actions"><button class="decision-later" data-act="decisionReject" data-id="${t.id}" data-key="${esc(key)}">الان نمی‌تونم</button><button class="decision-start" data-act="decisionStart" data-id="${t.id}" data-key="${esc(key)}">شروع می‌کنم</button></div>
     ${advisor?`<button class="decision-done" data-act="decisionDone" data-id="${t.id}" data-key="${esc(key)}">این کار را انجام دادم</button>`:''}
@@ -229,7 +229,7 @@ function handleAdvisorMessage(raw){
   }
   if(/(?:این|همین).*(?:مهم نیست|کم.?اهمیت)|(?:مهم نیست|کم.?اهمیت).*(?:این|همین)/.test(text)&&current){setExplicitTaskPriority(current,text,'low');advisorSay('assistant',`اهمیت «${current.title}» را پایین‌تر ثبت کردم. ${advisorNextText()}`);render();return}
   if(advisorTaskIntent(text)){
-    const made=addTaskFromAdvisor(text);if(made.duplicate)advisorSay('assistant',`«${made.task.title}» از قبل در کارهایت هست.`);else{const t=made.task,when=t.date===TODAY()?'امروز':t.date===addDays(TODAY(),1)?'فردا':fa(jdate(t.date));advisorSay('assistant',`فهمیدم که این یک کار است؛ «${t.title}» را برای ${when}${t.time?' ساعت '+fa(t.time):''} در «${CATS[t.c].name}» ثبت کردم.`)}render();return
+    const made=addTaskFromAdvisor(text);if(made.duplicate)advisorSay('assistant',`«${made.task.title}» از قبل در کارهایت هست.`);else{const t=made.task,when=t.date===TODAY()?'امروز':t.date===addDays(TODAY(),1)?'فردا':fa(jdate(t.date));advisorSay('assistant',`فهمیدم که این یک کار است؛ «${t.title}» را برای ${when}${t.time?' ساعت '+fa(t.time):''} در «${taskDomainLabel(t)}» ثبت کردم.`)}render();return
   }
   const x=chooseAdvisorTask(),t=x&&x.task,base=t&&byId(t.id);if(!t){advisorSay('assistant','فعلاً پیشنهادی ندارم؛ اگر کاری در ذهنت هست طبیعی بنویس تا ثبتش کنم.');render();return}
   S.advisorContext={taskId:t.id,taskKey:decisionKey(t),at:new Date().toISOString()};
@@ -317,7 +317,7 @@ function plannerView(list,d){
       <div class="plan-time"><b>${clock(x.start)}</b><span>${fa(x.duration)} دقیقه</span></div>
       <i class="plan-line"><u></u></i>
       <div class="plan-item"><button class="box" data-act="toggle" data-id="${x.t.id}" data-date="${x.t.key||d}" aria-label="انجام شد"></button>
-        <div data-act="edit" data-id="${x.t.id}"><b>${esc(x.t.title)}</b><span>${CATS[x.t.c].name} · ${x.fixed?'ساعت ثابت':'زمان پیشنهادی'}${live?' · اکنون':''}</span></div></div></div>`;
+        <div data-act="edit" data-id="${x.t.id}"><b>${esc(x.t.title)}</b><span>${taskDomainLabel(x.t)} · ${x.fixed?'ساعت ثابت':'زمان پیشنهادی'}${live?' · اکنون':''}</span></div></div></div>`;
   });
   h+='</div>';
   if(!approved)h+=`<div class="planner-confirm"><button class="b-nu" data-act="planClose" data-id="0">فعلاً نه</button><button class="b-gold" data-act="planApprove" data-id="0">این برنامه خوبه</button></div>`;
@@ -351,7 +351,7 @@ function dayList(d){
   if(!dt.length)return h;
   return h+'<div class="list">'+dt.map(t=>`<div class="drow"><span class="acc" style="background:${col(CATS[t.c].h)}"></span>
     <div style="flex:1;min-width:0" data-act="edit" data-id="${t.id}"><div class="t">${esc(t.title)}</div>
-    <div class="m">${CATS[t.c].name} · ${t.time?fa(t.time):SLOTS[t.s]} · ${PRI[t.p]}${t.rep?' · '+repLabel(t):''}</div></div></div>`).join('')+'</div>';
+    <div class="m">${taskDomainLabel(t)} · ${t.time?fa(t.time):SLOTS[t.s]} · ${PRI[t.p]}${t.rep?' · '+repLabel(t):''}</div></div></div>`).join('')+'</div>';
 }
 
 function weekView(){
@@ -407,31 +407,11 @@ const dlabel=d=>{const t=TODAY();
   return d===t?'امروز':d===addDays(t,1)?'فردا':d===addDays(t,-1)?'دیروز':fa(WD[wdIndex(d)]+' '+jdate(d))};
 
 function catView(){
-  if(S.cat!==null&&S.cat!==undefined){
-    const c=CATS[S.cat];
-    const items=S.tasks.filter(t=>t.c===S.cat)
-      .sort((a,b)=>((a.done?1:0)-(b.done?1:0))||(a.date<b.date?-1:a.date>b.date?1:0)||(a.s-b.s)||(a.p-b.p));
-    let h=`<div class="mhead">
-      <button class="mnav" data-act="cat" data-v="" data-id="0">›</button>
-      <b style="display:flex;align-items:center;gap:8px">
-        <span class="tile" style="width:28px;height:28px;border-radius:9px;color:${col(c.h)};background:${col(c.h,.13)}"><svg viewBox="0 0 24 24"><path d="${c.ic}"/></svg></span>
-        ${c.name} — ${fa(items.length)} کار</b>
-      <span style="width:34px;flex:none"></span></div>`;
-    if(!items.length)h+='<div class="empty">در این دسته هنوز کاری ثبت نشده.</div>';
-    else h+='<div class="list">'+items.map(t=>`<div class="drow"><span class="acc" style="background:${col(c.h)}"></span>
-      <div style="flex:1;min-width:0" data-act="edit" data-id="${t.id}">
-        <div class="t" ${t.done&&!t.rep?'style="text-decoration:line-through;color:#6E7179"':''}>${esc(t.title)}</div>
-        <div class="m">${t.rep?repLabel(t)+(t.until?' تا '+fa(jdate(t.until)):'')+' · از '+dlabel(t.date):dlabel(t.date)} · ${t.time?fa(t.time):SLOTS[t.s]} · ${PRI[t.p]}</div>
-      </div></div>`).join('')+'</div>';
-    return h;
+  if(TASK_DOMAINS[S.cat]){
+    const info=TASK_DOMAINS[S.cat],items=S.tasks.filter(t=>taskDomain(t)===S.cat).sort((a,b)=>Number(a.done)-Number(b.done)||a.date.localeCompare(b.date));
+    return `<div class="mhead"><button class="mnav" data-act="cat" data-v="" data-id="0">›</button><b>${info.icon} ${info.label} — ${fa(items.length)} کار</b></div><div class="list">${items.map(taskCard).join('')||'<div class="empty">کاری در این دسته نیست.</div>'}</div>`;
   }
-  let g='<div class="grid">'+CATS.map((c,i)=>{
-    const n=S.tasks.filter(t=>t.c===i&&(t.rep||!t.done)).length;
-    return `<div class="cat" data-act="cat" data-v="${i}" data-id="0"><div class="tile" style="color:${col(c.h)};background:${col(c.h,.13)}">
-      <svg viewBox="0 0 24 24"><path d="${c.ic}"/></svg></div>
-      <div class="n">${c.name}</div><div class="c">${n?fa(n)+' کار':'خالی'}</div></div>`;
-  }).join('')+'</div>';
-  return g;
+  return '<div class="grid">'+Object.entries(TASK_DOMAINS).map(([d,info])=>`<div class="cat" data-act="cat" data-v="${d}" data-id="0"><div class="tile">${info.icon}</div><div class="n">${info.label}</div><div class="c">${fa(S.tasks.filter(t=>taskDomain(t)===d&&!t.done).length)} کار</div></div>`).join('')+'</div>';
 }
 
 /* ================= backup / restore ================= */
@@ -482,9 +462,9 @@ function openSheet(id){
   if(t){dr.value=t.note||t.title;
     const auto=titleFrom(t.note||t.title);
     S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,every:t.every||null,until:t.until||null,date:t.date,time:t.time||null,
-          title:t.title,titleManual:t.title!==auto,touched:true,domain:t.meta?.domain||null};}
+          title:t.title,titleManual:t.title!==auto,touched:true,domain:taskDomain(t)};}
   else {dr.value='';S.pv=null}
-  updatePv();ov.classList.add('show');setTimeout(()=>dr.focus(),60);
+  updatePv();document.getElementById('task-time').value=S.pv?.time||'';ov.classList.add('show');setTimeout(()=>dr.focus(),60);
 }
 function closeSheet(){ov.classList.remove('show');dr.blur()}
 document.getElementById('fab').onclick=()=>openSheet();
@@ -502,13 +482,11 @@ function updatePv(){
   pv.classList.add('show');
   const g=S.pv,today=TODAY();
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
+  if(!g.domain)g.domain=taskDomain({c:g.c});
+  document.getElementById('task-time').value=g.time||'';
   pc.innerHTML=
-    `<button class="chip" data-f="c" style="color:${col(CATS[g.c].h)};background:${col(CATS[g.c].h,.13)}"><span class="d5" style="background:${col(CATS[g.c].h)}"></span>${CATS[g.c].name}</button>`+
     `<button class="chip c-nu" data-f="date">${dl}</button>`+
-    `<button class="chip c-nu" data-f="s">${SLOTS[g.s]}</button>`+
-    `<button class="chip c-nu" data-f="time">${g.time?fa(g.time):'بدون ساعت'}</button>`+
-    `<button class="chip c-nu" data-f="p">${PRI[g.p]}</button>`+
-    `<button class="chip c-nu" data-f="domain">${TASK_DOMAINS[g.domain]?.label||'محل کار / خانه / شخصی'}</button>`+
+    `<button class="chip c-nu" data-f="domain">${TASK_DOMAINS[g.domain].icon} ${TASK_DOMAINS[g.domain].label}</button>`+
     `<button class="chip c-inf" data-f="rep">${g.rep?repLabel(g):'بدون تکرار'}</button>`+
     (g.rep?`<button class="chip c-inf" data-f="until">${g.until?'تا '+fa(jdate(g.until)):'بدون پایان'}</button>`:'');
   pc.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>picker(b.dataset.f));
@@ -521,6 +499,11 @@ function updatePv(){
   };
 }
 dr.addEventListener('input',()=>updatePv());
+document.getElementById('task-time').onchange=e=>{
+  if(!S.pv)S.pv=Object.assign({touched:false,titleManual:false},classify(dr.value.trim()));
+  S.pv.time=e.target.value||null;if(S.pv.time)S.pv.s=slotOfTime(S.pv.time);
+  S.pv.touched=true;updatePv();
+};
 
 /* ورود صوتی فقط متن را پر می‌کند؛ تحلیل و ذخیره دقیقاً همان مسیر ورود متنی است. */
 const mic=document.getElementById('voice-input');
@@ -697,6 +680,7 @@ function userMemoryPicker(){
 sb.onclick=()=>{
   const txt=dr.value.trim();if(!txt)return;
   const g=S.pv||Object.assign({titleManual:false},classify(txt));
+  if(!g.domain)g.domain=taskDomain({c:g.c});
   const ttl=(g.titleManual&&g.title)?g.title:titleFrom(txt);
   const today=TODAY();
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
@@ -720,7 +704,7 @@ sb.onclick=()=>{
   const question=detectImportantAmbiguity(newTask),entry=question?registerClarificationQuestion(newTask,question):null;
   save();closeSheet();S.tab=0;S.day=g.date;S.pv=null;dr.value='';render();
   if(entry)setTimeout(()=>clarificationPicker(newTask,question,entry),80);
-  else toast(`اضافه شد به «${CATS[g.c].name}»${g.rep?' · '+repLabel(g)+(g.until?' تا '+fa(jdate(g.until)):''):''} · پیشنهاد: ${dl} ${g.time?fa(g.time):SLOTS[g.s]}`);
+  else toast(`اضافه شد به «${TASK_DOMAINS[g.domain].label}»${g.rep?' · '+repLabel(g)+(g.until?' تا '+fa(jdate(g.until)):''):''} · پیشنهاد: ${dl} ${g.time?fa(g.time):SLOTS[g.s]}`);
 };
 
 document.getElementById('sh-del').onclick=()=>{

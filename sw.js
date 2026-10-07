@@ -1,5 +1,5 @@
-const C = 'karnama-v66';
-const FILES = ['./', './index.html', './core.js?v=66', './memory.js?v=66', './behavior.js?v=66', './study.js?v=66', './graph.js?v=66', './decision.js?v=66', './clarify.js?v=66', './views.js?v=66', './style.css?v=66', './manifest.json?v=66', './icon-192.png?v=66', './icon-512.png?v=66', './icon-maskable.png?v=66', './logo-karnama.png?v=66'];
+const C = 'karnama-v67';
+const FILES = ['./', './index.html', './core.js?v=67', './memory.js?v=67', './behavior.js?v=67', './study.js?v=67', './graph.js?v=67', './decision.js?v=67', './clarify.js?v=67', './views.js?v=67', './style.css?v=67', './manifest.json?v=67', './icon-192.png?v=67', './icon-512.png?v=67', './icon-maskable.png?v=67', './logo-karnama.png?v=67'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => Promise.all(FILES.map(f => c.add(f).catch(() => {})))).then(() => self.skipWaiting()));
 });

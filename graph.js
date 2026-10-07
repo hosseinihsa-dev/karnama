@@ -9,12 +9,14 @@ function graphReadiness(t,date=TODAY()){
   return {blocked:false,kind:'ready',reason:'پیش‌نیازهای ثبت‌شده انجام شده‌اند',pending:[]};
 }
 function domainPreference(t,date=TODAY(),minutes=decisionNowMinutes()){
-  const m=t.meta||{},d=m.domain;if(!TASK_DOMAINS[d])return 0;
+  const m=t.meta||{},d=taskDomain(t);if(!TASK_DOMAINS[d])return 0;
   const schedule=m.workSchedule||{days:[0,1,2,3,4,5],start:600,end:1080};
   const atWork=schedule.days.includes(wdIndex(date))&&minutes>=schedule.start&&minutes<schedule.end;
   return (d==='work')===atWork?1:-1;
 }
-function domainChip(t){const d=t.meta?.domain,x=TASK_DOMAINS[d];return x?`<span class="chip domain-${d}">${x.icon} ${x.label}</span>`:''}
+function taskDomain(t){return TASK_DOMAINS[t.meta?.domain]?t.meta.domain:t.c===4?'work':t.c===5?'home':'personal'}
+function taskDomainLabel(t){return TASK_DOMAINS[taskDomain(t)].label}
+function domainChip(t){const d=taskDomain(t),x=TASK_DOMAINS[d];return x?`<span class="chip domain-${d}">${x.icon} ${x.label}</span>`:''}
 function graphTaskStatus(t){if(t.done)return 'انجام‌شده';const r=graphReadiness(t);return r.blocked?r.reason:'قابل انجام'}
 function validateTaskGraph(data){
   if(data?.format!=='karnama.task-graph'||!Array.isArray(data.tasks)||data.tasks.length>2000)throw new Error('فایل ورود گراف معتبر نیست');

@@ -2,6 +2,10 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const storage={},ctx=vm.createContext({console,Date,Intl,setTimeout,clearTimeout,localStorage:{getItem:k=>storage[k]||null,setItem:(k,v)=>storage[k]=v}});
 vm.runInContext(['core.js','memory.js','behavior.js','decision.js','graph.js'].map(f=>fs.readFileSync(f,'utf8')).join('\n')+`\n globalThis.A={TODAY,addDays,graphReadiness,domainPreference,importTaskGraph,validateTaskGraph,chooseNextTask,assessNowFeasibility,decisionFingerprint,setTasks:x=>S.tasks=x,tasks:()=>S.tasks};`,ctx);
 const A=ctx.A,D='2026-10-07';
+assert.equal(vm.runInContext("taskDomain({c:4})",ctx),'work');
+assert.equal(vm.runInContext("taskDomain({c:5})",ctx),'home');
+assert.equal(vm.runInContext("taskDomain({c:1})",ctx),'personal');
+assert.equal(vm.runInContext("taskDomain({c:4,meta:{domain:'home'}})",ctx),'home','Explicit domain overrides legacy category');
 const fixture={format:'karnama.task-graph',source:'test',tasks:[
   {sourceId:'a',title:'مرحله اول',domain:'work',state:'ready',date:D,prerequisiteSourceIds:[]},
   {sourceId:'b',title:'مرحله دوم',domain:'home',state:'waiting',waitingReason:'منتظر پاسخ',date:D,prerequisiteSourceIds:[]},
