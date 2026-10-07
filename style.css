@@ -309,4 +309,8 @@ body.advisor-mode main{padding-bottom:104px}
 .home-add-task{width:100%;max-width:460px;min-height:64px;margin-top:24px;padding:16px 22px;border-radius:20px;display:flex;align-items:center;justify-content:center;gap:12px;background:#b9e633;color:#101408;font-size:17px;font-weight:750;box-shadow:0 8px 24px rgba(0,0,0,.2)}
 .home-add-task svg{width:28px;height:28px;stroke:currentColor;stroke-width:2.3;stroke-linecap:round}
 .defer-selected{text-align:center;color:#e8c551;font-size:16px;font-weight:700;margin:0 0 14px}.mcell:disabled{opacity:.3;cursor:default}
+#pick .bx:has(.defer-footer){max-height:calc(100dvh - 32px);overflow:hidden;gap:10px}
+.defer-calendar{min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.defer-calendar .defer-selected{margin:0}.defer-calendar .date-quick{margin:0}.defer-calendar .mcell{aspect-ratio:auto;min-height:34px}.defer-calendar .mgrid{gap:4px;flex-shrink:0}
+.defer-footer{flex-shrink:0;border-top:1px solid #2a2c34;padding-top:10px;gap:8px}.defer-footer input{height:46px}.defer-footer button{min-height:48px}
 body.advisor-mode main{padding-bottom:38px}
