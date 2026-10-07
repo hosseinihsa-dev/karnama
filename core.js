@@ -61,7 +61,7 @@ function occursOn(t,d){
   if(t.rep==='هر ماه')return jparts(d).d===jparts(t.date).d;
   return false;
 }
-const isDone=(t,k)=>t.rep?!!(t.doneOn&&t.doneOn[k]):!!t.done;
+const isDone=(t,k)=>t.rep?!!((t.doneOn&&t.doneOn[k])||(t.skippedOn&&t.skippedOn[k])):!!t.done;
 /* an every-N-hours task shows several times a day, each dose on its own line */
 function doseTimes(t,d){
   const every=Math.max(1,Math.min(24,+t.every||8))*60;

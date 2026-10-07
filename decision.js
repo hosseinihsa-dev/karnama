@@ -23,6 +23,8 @@ function assessNowFeasibility(t,{date=TODAY(),nowMin=decisionNowMinutes()}={}){
   const text=decisionText(t),hour=nowMin/60,unusualNight=hour<7||hour>=22;
   const result=(status,reason,source,confidence)=>({status,reason,source,confidence,date,nowMin});
   const explicit=t.time?tmin(t):null;
+  const prerequisiteId=decisionMeta(t).prerequisiteTaskId;
+  if(prerequisiteId){const prerequisite=S.tasks.find(x=>x.id===prerequisiteId);if(prerequisite&&!prerequisite.done)return result(FEASIBLE_NOW.NO,'اول باید کار پیش‌نیاز انجام شود','linked-prerequisite',1)}
 
   /* داده صریح کاربر همیشه بر قاعده عمومی شب مقدم است. */
   if(explicit!==null){
@@ -38,7 +40,7 @@ function assessNowFeasibility(t,{date=TODAY(),nowMin=decisionNowMinutes()}={}){
     const value=norm(context.timeConstraint.value),cutoff=/تا\s*ظهر/.test(value)?12*60:/تا\s*عصر/.test(value)?18*60:/تا\s*شب/.test(value)?22*60:null;
     if(cutoff!==null&&nowMin>cutoff)return result(FEASIBLE_NOW.NO,'بازه زمانی صریحی که کاربر گفته گذشته است','explicit-time-constraint',1);
   }
-  if(context&&context.prerequisite&&context.prerequisite.value)return result(FEASIBLE_NOW.UNKNOWN,'این کار پیش‌نیازی دارد که انجام‌شدنش هنوز مشخص نیست','explicit-prerequisite',.65);
+  if(!prerequisiteId&&context&&context.prerequisite&&context.prerequisite.value)return result(FEASIBLE_NOW.UNKNOWN,'این کار پیش‌نیازی دارد که انجام‌شدنش هنوز مشخص نیست','explicit-prerequisite',.65);
 
   const external=/آتلیه|فروشگاه|مغازه|اداره|بانک|دفتر|مطب|پست|داروخانه|خرید حضوری|تحویل\s*(?:بگیر|بگیرم)|مراجعه/.test(text)||[3,7].includes(t.c);
   const otherPerson=/تماس|زنگ\s*(?:بزن|بزنم)|صحبت\s+با|جلسه|قرار|ملاقات|از\s+.+\s+بپرس|به\s+.+\s+پیام/.test(text)||t.c===0;
@@ -51,7 +53,7 @@ function assessNowFeasibility(t,{date=TODAY(),nowMin=decisionNowMinutes()}={}){
   return result(FEASIBLE_NOW.UNKNOWN,'اطلاعات کافی برای تشخیص قطعی امکان انجام وجود ندارد','insufficient-data',.3);
 }
 
-const decisionFingerprint=t=>JSON.stringify([t.title||'',t.note||'',t.date||'',t.time||'',t.s,t.p,t.c,taskContext(t)||null]);
+const decisionFingerprint=t=>JSON.stringify([t.title||'',t.note||'',t.date||'',t.time||'',t.s,t.p,t.c,taskContext(t)||null,decisionMeta(t).prerequisiteTaskId?!!(S.tasks.find(x=>x.id===decisionMeta(t).prerequisiteTaskId)||{}).done:null]);
 function recentDecisionRejections(date=TODAY()){
   const map=new Map();DECISION.feedback.forEach(x=>{if(x&&x.date===date&&x.kind==='reject'&&x.taskKey)map.set(x.taskKey,x.fingerprint||null)});return map;
 }

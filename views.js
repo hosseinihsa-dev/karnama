@@ -147,23 +147,33 @@ function decisionPanel(today,x=chooseNextTask(S.tasks,today),advisor=false){
   </section>`;
 }
 
+function postponeSuggestedTask(t,date,time){
+  let base=byId(t.id);if(!base)return null;
+  if(base.rep){base.skippedOn=base.skippedOn||{};base.skippedOn[t.key||TODAY()]=1;const copy=Object.assign({},base,{id:Date.now(),rep:null,every:null,until:null,done:false,date,time,meta:Object.assign({},base.meta||{},{postponedFrom:decisionKey(t)})});delete copy.doneOn;delete copy.skippedOn;S.tasks.push(copy);base=copy}
+  else{recordTaskPostponedBehavior(base,base.date,date);base.date=date;base.time=time}
+  base.date=date;base.time=time;base.s=time?slotOfTime(time):base.s;base.rem=true;base.meta=Object.assign({},base.meta||{},{reminderAt:date+(time?'T'+time: 'T09:00'),reminderShown:false});save();return base;
+}
 function decisionRejectPicker(id,key){
   const t=decisionCandidates(S.tab===0?advisorTaskPool():S.tasks,TODAY()).find(x=>x.id===id&&decisionKey(x)===key)||byId(id);if(!t)return;
-  pk._onDismiss=null;
-  pk.classList.remove('cat-mode');pkbx.classList.remove('cat-mode');
-  const reasons=[['no-time','وقت ندارم'],['no-energy','انرژی ندارم'],['blocked','شرایطش فراهم نیست'],['other','دلیل دیگر']];
-  pkbx.innerHTML=`<h4>چرا الان نمی‌تونی؟</h4><div class="decision-reject-note">این بازخورد فقط برای بهترشدن پیشنهادهای بعدی روی همین دستگاه ذخیره می‌شود.</div>`+
-    reasons.map((r,i)=>`<button class="op" data-i="${i}">${r[1]}</button>`).join('')+
-    `<div class="decision-custom"><label for="decision-own-reason">دلیل خودم <span>اختیاری</span></label><textarea id="decision-own-reason" rows="3" placeholder="مثلاً: آتلیه الان بسته است"></textarea><button data-own-reason="1">ثبت دلیل من</button></div>`;
-  const finish=(code,text='')=>{recordDecisionEvent('reject',t,{code,text:text.trim()||null});pk.classList.remove('show');render();toast('متوجه شدم؛ پیشنهاد بعدی را با این بازخورد بررسی کردم.',2800)};
-  pkbx.querySelectorAll('.op').forEach((b,i)=>b.onclick=()=>finish(reasons[i][0]));
-  pkbx.querySelector('[data-own-reason]').onclick=()=>{const input=pkbx.querySelector('#decision-own-reason');if(!input.value.trim()){toast('اگر خواستی دلیل خودت را بنویس؛ یا یکی از گزینه‌های بالا را بزن.',3000);input.focus();return}finish('custom',input.value)};
+  pk._onDismiss=null;pk.classList.remove('cat-mode');pkbx.classList.remove('cat-mode','memory-box');
+  const finish=()=>{pk.classList.remove('show');save();render()};
+  const schedule=()=>{
+    pkbx.innerHTML=`<h4>چه زمانی دوباره یادآوری کنم؟</h4><div class="time-exact"><label>روز یادآوری<input id="defer-date" type="date" min="${TODAY()}" value="${addDays(TODAY(),1)}"></label><label>ساعت دقیق<input id="defer-time" type="time" step="60" value="09:00"></label><p class="decision-reject-note">در نسخه وب، یادآوری هنگام بازبودن کارنما نمایش داده می‌شود؛ با بازکردن دوباره هم موعدهای رسیده را می‌بینی.</p><button class="b-gold" id="defer-save">ثبت زمان یادآوری</button></div>`;
+    pkbx.querySelector('#defer-save').onclick=()=>{const date=pkbx.querySelector('#defer-date').value,time=pkbx.querySelector('#defer-time').value;if(!date||!time||new Date(date+'T'+time)<=new Date()){toast('یک زمان آینده انتخاب کن.',3000);return}recordDecisionEvent('reject',t,{code:'no-time',date,time});postponeSuggestedTask(t,date,time);finish();toast('زمان جدید و یادآوری ثبت شد.',3000)};
+  };
+  const prerequisite=()=>{
+    pkbx.innerHTML='<h4>اول چه کاری باید انجام شود؟</h4><div class="decision-custom"><label for="prerequisite-text">پیش‌نیاز را طبیعی توضیح بده</label><textarea id="prerequisite-text" placeholder="مثلاً اول باید فایل‌ها را از مرتضی بگیرم"></textarea><button id="prerequisite-save">ساخت پیش‌نیاز و تغییر پیشنهاد</button></div>';
+    pkbx.querySelector('#prerequisite-save').onclick=()=>{const text=pkbx.querySelector('#prerequisite-text').value.trim();if(text.length<3){toast('پیش‌نیاز را بنویس.',2500);return}const base=byId(t.id);if(!base){toast('پیش‌نیاز برای کارهای عادی قابل ثبت است.',3000);return}const parsed=classify(text),title=titleFrom(text.replace(/^اول\s+(?:باید\s+)?/,''));let task=S.tasks.find(x=>!x.done&&x.id!==base.id&&norm(x.title)===norm(title));if(!task){task={id:Date.now(),title,note:text,c:parsed.c===11?12:parsed.c,p:0,s:parsed.s,date:TODAY(),time:parsed.time,done:false,rep:null,meta:parsed.meta};if(task.meta.context)task.meta.context.prerequisite=null;S.tasks.push(task)}setExplicitTaskPriority(task,'پیش‌نیاز کار «'+base.title+'»');base.meta=Object.assign({},base.meta||{},{prerequisiteTaskId:task.id});recordDecisionEvent('reject',t,{code:'blocked',text,prerequisiteTaskId:task.id});finish();toast('پیش‌نیاز ساخته شد؛ کار اصلی تا انجام آن کنار گذاشته شد.',4000)};
+  };
+  pkbx.innerHTML='<h4>چرا الآن نمی‌تونی؟</h4><button class="op" id="reject-time">زمان دیگری انجام می‌دهم</button><button class="op" id="reject-prerequisite">اول یک کار دیگر لازم است</button><button class="op" id="reject-energy">انرژی ندارم؛ فردا</button>';
+  pkbx.querySelector('#reject-time').onclick=schedule;pkbx.querySelector('#reject-prerequisite').onclick=prerequisite;
+  pkbx.querySelector('#reject-energy').onclick=()=>{recordDecisionEvent('reject',t,{code:'no-energy'});postponeSuggestedTask(t,addDays(TODAY(),1),'09:00');finish();toast('برای فردا ساعت ۹ گذاشتم.',3000)};
   pk.classList.add('show');
 }
-
-const ADVISOR_CHAT_KEY='karnama.advisor.chat.v1';let ACTIVE_SPEECH=null;
-try{if(!S.advisorChat.length){const saved=JSON.parse(localStorage.getItem(ADVISOR_CHAT_KEY));if(Array.isArray(saved))S.advisorChat=saved.slice(-24)}}catch(e){}
-function advisorSay(role,text){S.advisorChat=S.advisorChat||[];S.advisorChat.push({role,text,at:new Date().toISOString()});if(S.advisorChat.length>24)S.advisorChat=S.advisorChat.slice(-24);try{localStorage.setItem(ADVISOR_CHAT_KEY,JSON.stringify(S.advisorChat))}catch(e){}}
+function checkTaskReminders(){
+  const now=new Date();for(const task of S.tasks){const meta=task.meta||{};if(!task.done&&meta.reminderAt&&!meta.reminderShown&&new Date(meta.reminderAt)<=now){meta.reminderShown=true;save();toast('وقت انجام «'+task.title+'» رسیده است.',7000);if(window.Notification&&Notification.permission==='granted')navigator.serviceWorker.ready.then(r=>r.showNotification('کارنما',{body:task.title,tag:'task-'+task.id})).catch(()=>{});render();break}}
+}
+setInterval(checkTaskReminders,30000);setTimeout(checkTaskReminders,1500);
 function advisorNextText(){const n=chooseAdvisorTask();return n?`پیشنهاد بعدی من «${n.task.title}» است؛ ${n.reason}.`:'فعلاً کار مشخص دیگری ندارم که با اطمینان پیشنهاد بدهم.'}
 function advisorTaskReference(text,current){
   const n=norm(text),active=S.tasks.filter(t=>!t.done);if(/(?:این|همین|این یکی|همین یکی)s*(?:کار)?/.test(n)&&current)return current;
