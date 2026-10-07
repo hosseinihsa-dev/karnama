@@ -313,4 +313,6 @@ body.advisor-mode main{padding-bottom:104px}
 .defer-calendar{min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
 .defer-calendar .defer-selected{margin:0}.defer-calendar .date-quick{margin:0}.defer-calendar .mcell{aspect-ratio:auto;min-height:34px}.defer-calendar .mgrid{gap:4px;flex-shrink:0}
 .defer-footer{flex-shrink:0;border-top:1px solid #2a2c34;padding-top:10px;gap:8px}.defer-footer input{height:46px}.defer-footer button{min-height:48px}
+body.advisor-mode main{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
+.home-add-task{position:fixed;z-index:2;bottom:calc(12px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:calc(100% - 36px);margin-top:0}
 body.advisor-mode main{padding-bottom:38px}

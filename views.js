@@ -7,13 +7,14 @@ function taskCard(t,i){
       <span class="rank">${fa(String(i+1).padStart(2,'0'))}</span></div>`;
 }
 function advisorTaskPool(date=TODAY()){
-  const tasks=[...S.tasks],now=new Date(),slot=slotOfTime(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
-  (STUDY||[]).filter(p=>studyRemaining(p)>0&&studyActive(p,date)).forEach(p=>tasks.push({id:-Math.abs(+p.id||1),title:`مطالعه ${p.title}`,note:`برنامه مطالعه ${p.title}`,c:1,p:1,s:slot,date,done:false,rep:null,time:null,meta:{advisorStudy:true,studyId:p.id}}));
+  const studyDue=p=>p&&studyStats(p,date).target>0;
+  const tasks=S.tasks.filter(t=>!t.meta?.advisorStudy||studyDue(studyById(t.meta.studyId))),now=new Date(),slot=slotOfTime(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
+  (STUDY||[]).filter(studyDue).forEach(p=>tasks.push({id:-Math.abs(+p.id||1),title:`مطالعه ${p.title}`,note:`برنامه مطالعه ${p.title}`,c:1,p:1,s:slot,date,done:false,rep:null,time:null,meta:{advisorStudy:true,studyId:p.id}}));
   return tasks;
 }
 function chooseAdvisorTask(date=TODAY()){
-  const regular=chooseNextTask(S.tasks,date);if(regular)return regular;
-  const studyOnly=advisorTaskPool(date).filter(t=>t.meta&&t.meta.advisorStudy);return chooseNextTask(studyOnly,date);
+  const pool=advisorTaskPool(date),regular=chooseNextTask(pool.filter(t=>!t.meta?.advisorStudy),date);if(regular)return regular;
+  const studyOnly=pool.filter(t=>t.meta&&t.meta.advisorStudy);return chooseNextTask(studyOnly,date);
 }
 
 /* ================= render ================= */
