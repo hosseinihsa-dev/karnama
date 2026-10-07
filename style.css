@@ -270,7 +270,7 @@ nav button.on span{color:#C9A227}
 
 /* ---------- immersive coach v54 ---------- */
 body.advisor-mode{background:#0c0e0d}
-body.advisor-mode:before{content:"";position:fixed;inset:0 0 auto;height:48vh;background:radial-gradient(circle at 18% 0,rgba(193,229,43,.28),transparent 42%),radial-gradient(circle at 75% 4%,rgba(61,106,22,.25),transparent 38%);filter:blur(18px);pointer-events:none}
+body.advisor-mode:before{display:none}
 body.advisor-mode header{position:relative;z-index:2;align-items:center;justify-content:flex-end;padding-bottom:4px;min-height:70px;background:transparent;border:0;box-shadow:none}
 body.advisor-mode header:after{display:none}
 body.advisor-mode header>div{display:none}
@@ -306,3 +306,6 @@ body.advisor-mode main{padding-bottom:104px}
 .coach-compose{bottom:calc(18px + env(safe-area-inset-bottom))}
 .side-link-accent{border-color:rgba(201,162,39,.38)!important;background:rgba(201,162,39,.09)!important}.side-link-accent b,.side-link-accent svg{color:#e8c551!important}
 #toast{bottom:calc(88px + env(safe-area-inset-bottom))}
+.home-add-task{width:100%;max-width:460px;min-height:64px;margin-top:24px;padding:16px 22px;border-radius:20px;display:flex;align-items:center;justify-content:center;gap:12px;background:#b9e633;color:#101408;font-size:17px;font-weight:750;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.home-add-task svg{width:28px;height:28px;stroke:currentColor;stroke-width:2.3;stroke-linecap:round}
+body.advisor-mode main{padding-bottom:38px}

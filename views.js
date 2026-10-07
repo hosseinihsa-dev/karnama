@@ -57,6 +57,7 @@ function render(){
       }
       else if(a==='decisionReject')decisionRejectPicker(id,el.dataset.key);
       else if(a==='decisionDone'){const x=decisionCandidates(S.tab===0?advisorTaskPool():S.tasks,TODAY()).find(t=>t.id===id&&decisionKey(t)===(el.dataset.key||decisionKey(t)))||byId(id);if(x&&x.meta&&x.meta.advisorStudy){const p=studyById(x.meta.studyId),st=p&&studyStats(p);if(p&&st.target)addStudyProgress(p.id,st.target)}else if(x)toggle(x.id,x.key||TODAY());toast('انجام شد؛ پیشنهاد بعدی را بررسی کردم.',2600)}
+      else if(a==='addTask')openSheet();
       else if(a==='taskMode'){S.taskMode=el.dataset.v;render()}
       else if(a==='planPreview'){S.planPreview=true;render()}
       else if(a==='planClose'){S.planPreview=false;S.tab=0;render()}
@@ -67,10 +68,10 @@ function render(){
 }
 
 function advisorHome(overdue,list,doneN,today){
-  const x=chooseAdvisorTask(today),chat=(S.advisorChat||[]).slice(-6);
+  const x=chooseAdvisorTask(today);
   if(x)recordSuggestedBehavior(x.task,x);
-  const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2><p>${esc(x.reason)}</p><div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionStart" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">شروع می‌کنم</button></div></div>`:`<div class="advisor-proposal empty"><h2>فعلاً پیشنهاد مشخصی ندارم</h2><p>هر کاری توی ذهنت هست بنویس یا بگو.</p></div>`;
-  return `<section class="coach-home"><div class="coach-glow"></div><div class="coach-orb"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 7c6 0 10 3 13 8 3-5 7-8 13-8v7c-6 0-9 4-9 10v10h-8V24c0-6-3-10-9-10z"/></svg></div><h2 class="coach-question">الان دوست داری<br>روی چی تمرکز کنیم؟</h2><div class="coach-hints"><button data-advisor-text="الان چیکار کنم؟">الان چیکار کنم؟</button><button data-advisor-text="یه کار سبک‌تر بده">یک کار سبک‌تر</button><button data-advisor-text="کارهای امروز رو بگو">کارهای امروز</button></div>${proposal}${chat.length?`<div class="advisor-messages">${chat.map(m=>`<div class="advisor-msg ${m.role}">${esc(m.text)}</div>`).join('')}</div>`:''}<div class="coach-compose"><button class="coach-plus" id="coach-plus" aria-label="افزودن کار با جزئیات">+</button><textarea id="advisor-input" rows="1" aria-label="پیام به کارنما" placeholder="هرچی توی ذهنته بنویس..."></textarea><button id="advisor-send" aria-label="فرستادن پیام"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button><button id="advisor-voice" aria-label="گفت‌وگوی صوتی با کارنما"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4m7-4a7 7 0 0 1-14 0m7 7v4m-4 0h8"/></svg></button></div></section><div id="voice-stage" class="voice-stage" aria-hidden="true"><div class="voice-stage-glow"></div><button id="voice-close" aria-label="بستن شنیدن صدا">×</button><span>کارنما گوش می‌دهد...</span><div class="voice-orb"></div><p id="voice-transcript">صحبت کن؛ اگر کار باشد خودکار ثبتش می‌کنم.</p><button id="voice-stop" aria-label="پایان ضبط"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4m7-4a7 7 0 0 1-14 0m7 7v4"/></svg></button></div>`;
+  const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2><p>${esc(x.reason)}</p><div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionDone" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">✓ انجام شد</button></div></div>`:`<div class="advisor-proposal empty"><h2>فعلاً پیشنهاد مشخصی ندارم</h2><p>با دکمه زیر یک کار تازه اضافه کن.</p></div>`;
+  return `<section class="coach-home"><div class="coach-orb"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 7c6 0 10 3 13 8 3-5 7-8 13-8v7c-6 0-9 4-9 10v10h-8V24c0-6-3-10-9-10z"/></svg></div><h2 class="coach-question">قدم بعدی امروز</h2>${proposal}<button class="home-add-task" data-act="addTask" data-id="0"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>افزودن کار</span></button></section>`;
 }
 
 function tasksView(overdue,list,doneN,today){
