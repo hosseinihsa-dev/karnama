@@ -21,7 +21,10 @@ jobs:
       - name: Build site
         run: |
           mkdir -p site
-          cp index.html core.js memory.js behavior.js study.js decision.js clarify.js views.js style.css manifest.json sw.js site/
+          cp index.html core.js memory.js behavior.js study.js graph.js decision.js clarify.js views.js style.css manifest.json sw.js site/
+          for asset in $(sed -n 's/.*<script src="\([^?" ]*\).*/\1/p' index.html); do
+            test -s "site/$asset" || { echo "Missing published script: $asset"; exit 1; }
+          done
           python3 make_icons.py site
           touch site/.nojekyll
           ls -la site
