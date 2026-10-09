@@ -372,7 +372,7 @@ function toggle(id,k){
   if(t.rep){t.doneOn=t.doneOn||{};if(t.doneOn[k])delete t.doneOn[k];else{t.doneOn[k]=1;completed=true}}
   else {t.done=!t.done;completed=t.done}
   if(completed&&typeof recordTaskCompletedBehavior==='function')recordTaskCompletedBehavior(t,k);
-  save();render();
+  save();if(completed&&typeof askFollowupTask==='function')askFollowupTask(t);render();
 }
 function remove(id){
   const index=S.tasks.findIndex(t=>t.id===id);if(index<0)return null;
