@@ -1,5 +1,23 @@
 /* Local task graph. Task content is imported privately, never bundled in releases. */
 const TASK_DOMAINS={work:{label:'محل کار',icon:'▣'},home:{label:'خانه و خانواده',icon:'⌂'},personal:{label:'شخصی',icon:'●'}};
+const ACTIVE_TASK_DOMAINS={home:TASK_DOMAINS.home,personal:TASK_DOMAINS.personal};
+const REMOVED_WORK_KEY='karnama.removed-work.v69';
+function removeWorkTasks(){
+  const removed=S.tasks.filter(t=>taskDomain(t)==='work');if(!removed.length)return 0;
+  const ids=new Set(removed.map(t=>t.id));
+  const prior=JSON.parse(localStorage.getItem(REMOVED_WORK_KEY)||'{"tasks":[]}');
+  const archive={version:1,removedAt:new Date().toISOString(),tasks:[...(prior.tasks||[]),...removed]};
+  const kept=S.tasks.filter(t=>!ids.has(t.id)).map(t=>{
+    const m=t.meta||{},deps=[...(m.prerequisiteTaskIds||[]),...(m.prerequisiteTaskId?[m.prerequisiteTaskId]:[])];
+    if(!deps.some(id=>ids.has(id)))return t;
+    const meta=Object.assign({},m,{prerequisiteTaskIds:(m.prerequisiteTaskIds||[]).filter(id=>!ids.has(id)),removedWorkPrerequisites:deps.filter(id=>ids.has(id)),waiting:m.waiting&&!m.waiting.resolvedAt?m.waiting:{reason:'پیش‌نیاز محل کار حذف شده؛ آماده بودن این کار را تأیید کن',resolvedAt:null}});
+    if(ids.has(meta.prerequisiteTaskId))delete meta.prerequisiteTaskId;
+    return Object.assign({},t,{meta});
+  });
+  // Archive first; never remove tasks if recovery storage fails.
+  localStorage.setItem(REMOVED_WORK_KEY,JSON.stringify(archive));
+  localStorage.setItem(KEY,JSON.stringify({tasks:kept}));S.tasks=kept;return removed.length;
+}
 function graphReadiness(t,date=TODAY()){
   const m=t.meta||{},ids=[...new Set([...(m.prerequisiteTaskIds||[]),...(m.prerequisiteTaskId?[m.prerequisiteTaskId]:[])])];
   const pending=ids.filter(id=>{const p=S.tasks.find(x=>x.id===id);return !p||!p.done});
@@ -9,6 +27,7 @@ function graphReadiness(t,date=TODAY()){
   return {blocked:false,kind:'ready',reason:'پیش‌نیازهای ثبت‌شده انجام شده‌اند',pending:[]};
 }
 function domainPreference(t,date=TODAY(),minutes=decisionNowMinutes()){
+  if(taskDomain(t)!=='work')return 0;
   const m=t.meta||{},d=taskDomain(t);if(!TASK_DOMAINS[d])return 0;
   const schedule=m.workSchedule||{days:[0,1,2,3,4,5],start:600,end:1080};
   const atWork=schedule.days.includes(wdIndex(date))&&minutes>=schedule.start&&minutes<schedule.end;
@@ -54,5 +73,6 @@ function importTaskGraph(data){
 function resolveGraphWait(id){const t=byId(id);if(!t?.meta?.waiting)return;t.meta.waiting.resolvedAt=new Date().toISOString();save();render();toast('مانع رفع شد؛ وابستگی‌ها و موعد همچنان بررسی می‌شوند.',3000)}
 function graphView(){
   const tasks=S.tasks.filter(t=>t.meta?.domain&&!t.done);
-  return '<h2 class="graph-title">مسیر کارها</h2><p class="graph-note">رفع انتظار فقط پاسخ یا مانع را تأیید می‌کند؛ به معنی انجام‌شدن خود کار نیست.</p><button class="graph-import" data-act="graphImport">ورود فایل گراف (افزودن به کارهای فعلی)</button>'+Object.entries(TASK_DOMAINS).map(([d,info])=>`<section class="graph-group"><h3>${info.icon} ${info.label}</h3>${tasks.filter(t=>t.meta.domain===d).map(t=>{const r=graphReadiness(t),wait=t.meta.waiting;return `<article class="graph-card"><button class="graph-task-title" data-act="edit" data-id="${t.id}">${esc(t.title)}</button><div class="chips">${domainChip(t)}<span class="chip c-nu">${fa(WD[wdIndex(t.date)]+' '+jdate(t.date))}</span></div><p>${esc(graphTaskStatus(t))}</p>${r.pending.length?'<ul>'+r.pending.map(id=>'<li>'+esc(byId(id)?.title||'پیش‌نیاز حذف‌شده؛ باید بازیابی یا اصلاح شود')+'</li>').join('')+'</ul>':''}${wait&&!wait.resolvedAt?`<p>${esc(wait.reason)}</p><button class="graph-resolve" data-act="graphResolve" data-id="${t.id}">پاسخ رسید / مانع رفع شد</button>`:''}</article>`}).join('')||'<p class="graph-note">کاری در این گروه نیست.</p>'}</section>`).join('');
+  return '<h2 class="graph-title">مسیر کارها</h2><p class="graph-note">رفع انتظار فقط پاسخ یا مانع را تأیید می‌کند؛ به معنی انجام‌شدن خود کار نیست.</p><button class="graph-import" data-act="graphImport">ورود فایل گراف (افزودن به کارهای فعلی)</button>'+Object.entries(ACTIVE_TASK_DOMAINS).map(([d,info])=>`<section class="graph-group"><h3>${info.icon} ${info.label}</h3>${tasks.filter(t=>t.meta.domain===d).map(t=>{const r=graphReadiness(t),wait=t.meta.waiting;return `<article class="graph-card"><button class="graph-task-title" data-act="edit" data-id="${t.id}">${esc(t.title)}</button><div class="chips">${domainChip(t)}<span class="chip c-nu">${fa(WD[wdIndex(t.date)]+' '+jdate(t.date))}</span></div><p>${esc(graphTaskStatus(t))}</p>${r.pending.length?'<ul>'+r.pending.map(id=>'<li>'+esc(byId(id)?.title||'پیش‌نیاز حذف‌شده؛ باید بازیابی یا اصلاح شود')+'</li>').join('')+'</ul>':''}${wait&&!wait.resolvedAt?`<p>${esc(wait.reason)}</p><button class="graph-resolve" data-act="graphResolve" data-id="${t.id}">پاسخ رسید / مانع رفع شد</button>`:''}</article>`}).join('')||'<p class="graph-note">کاری در این گروه نیست.</p>'}</section>`).join('');
 }
+try{removeWorkTasks()}catch(error){console.error('Work task removal failed; original tasks preserved',error)}

@@ -408,11 +408,11 @@ const dlabel=d=>{const t=TODAY();
   return d===t?'امروز':d===addDays(t,1)?'فردا':d===addDays(t,-1)?'دیروز':fa(WD[wdIndex(d)]+' '+jdate(d))};
 
 function catView(){
-  if(TASK_DOMAINS[S.cat]){
+  if(ACTIVE_TASK_DOMAINS[S.cat]){
     const info=TASK_DOMAINS[S.cat],items=S.tasks.filter(t=>taskDomain(t)===S.cat).sort((a,b)=>Number(a.done)-Number(b.done)||a.date.localeCompare(b.date));
     return `<div class="mhead"><button class="mnav" data-act="cat" data-v="" data-id="0">›</button><b>${info.icon} ${info.label} — ${fa(items.length)} کار</b></div><div class="list">${items.map(taskCard).join('')||'<div class="empty">کاری در این دسته نیست.</div>'}</div>`;
   }
-  return '<div class="grid">'+Object.entries(TASK_DOMAINS).map(([d,info])=>`<div class="cat" data-act="cat" data-v="${d}" data-id="0"><div class="tile">${info.icon}</div><div class="n">${info.label}</div><div class="c">${fa(S.tasks.filter(t=>taskDomain(t)===d&&!t.done).length)} کار</div></div>`).join('')+'</div>';
+  return '<div class="grid">'+Object.entries(ACTIVE_TASK_DOMAINS).map(([d,info])=>`<div class="cat" data-act="cat" data-v="${d}" data-id="0"><div class="tile">${info.icon}</div><div class="n">${info.label}</div><div class="c">${fa(S.tasks.filter(t=>taskDomain(t)===d&&!t.done).length)} کار</div></div>`).join('')+'</div>';
 }
 
 /* ================= backup / restore ================= */
@@ -433,7 +433,7 @@ function doRestore(file){
       const d=JSON.parse(r.result);
       if(!d||!Array.isArray(d.tasks))throw 0;
       if(!confirm(`این فایل ${d.tasks.length} کار دارد. جایگزین کارهای فعلی شود؟`))return;
-      S.tasks=mergeSeries(d.tasks);
+      S.tasks=mergeSeries(d.tasks);removeWorkTasks();
       if(d.learn&&typeof d.learn==='object'){LEARN=d.learn;saveLearn()}
       if(Array.isArray(d.study)){STUDY=d.study;saveStudy()}
       if(d.decision&&typeof d.decision==='object')restoreDecision(d.decision);
@@ -448,7 +448,7 @@ function doRestore(file){
 }
 const impEl=document.getElementById('imp');
 if(impEl)impEl.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)doRestore(f);e.target.value=''};
-document.getElementById('graph-imp').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=JSON.parse(await f.text());const result=importTaskGraph(data);S.tab=8;render();toast(fa(`${result.added} کار اضافه شد؛ ${result.matched} کار موجود حفظ و مرتبط شد.`),4500)}catch(err){toast(err.message||'ورود فایل انجام نشد؛ داده‌های قبلی حفظ شدند.',4500)}};
+document.getElementById('graph-imp').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=JSON.parse(await f.text());const result=importTaskGraph(data);const removed=removeWorkTasks();S.tab=8;render();toast(fa(`${result.added-removed} کار اضافه شد؛ کارهای محل کار وارد فهرست فعال نشدند.`),4500)}catch(err){toast(err.message||'ورود فایل انجام نشد؛ داده‌های قبلی حفظ شدند.',4500)}};
 
 /* ================= capture sheet ================= */
 const ov=document.getElementById('ov'),dr=document.getElementById('draft'),
@@ -463,7 +463,7 @@ function openSheet(id){
   if(t){dr.value=t.note||t.title;
     const auto=titleFrom(t.note||t.title);
     S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,every:t.every||null,until:t.until||null,date:t.date,time:t.time||null,
-          title:t.title,titleManual:t.title!==auto,touched:true,domain:taskDomain(t)};}
+          title:t.title,titleManual:t.title!==auto,touched:true,domain:ACTIVE_TASK_DOMAINS[taskDomain(t)]?taskDomain(t):'personal'};}
   else {dr.value='';S.pv=null}
   updatePv();document.getElementById('task-time').value=S.pv?.time||'';ov.classList.add('show');setTimeout(()=>dr.focus(),60);
 }
@@ -483,7 +483,7 @@ function updatePv(){
   pv.classList.add('show');
   const g=S.pv,today=TODAY();
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
-  if(!g.domain)g.domain=taskDomain({c:g.c});
+  if(!ACTIVE_TASK_DOMAINS[g.domain])g.domain=g.c===5?'home':'personal';
   document.getElementById('task-time').value=g.time||'';
   pc.innerHTML=
     `<button class="chip c-nu" data-f="date">${dl}</button>`+
@@ -539,7 +539,7 @@ function askFollowupTask(task){
 }
 pk.querySelector('.bd').onclick=()=>{if(typeof pk._onDismiss==='function')pk._onDismiss();pk._onDismiss=null;pk.classList.remove('show');pkbx.classList.remove('memory-box')};
 function picker(f){
-  if(f==='domain'){pkbx.innerHTML='<h4>این کار مربوط به کدام بخش است؟</h4>'+Object.entries(TASK_DOMAINS).map(([d,x])=>`<button class="op" data-domain="${d}">${x.icon} ${x.label}</button>`).join('');pk.classList.add('show');pkbx.querySelectorAll('[data-domain]').forEach(b=>b.onclick=()=>{S.pv.domain=b.dataset.domain;S.pv.touched=true;pk.classList.remove('show');updatePv()});return}
+  if(f==='domain'){pkbx.innerHTML='<h4>این کار مربوط به کدام بخش است؟</h4>'+Object.entries(ACTIVE_TASK_DOMAINS).map(([d,x])=>`<button class="op" data-domain="${d}">${x.icon} ${x.label}</button>`).join('');pk.classList.add('show');pkbx.querySelectorAll('[data-domain]').forEach(b=>b.onclick=()=>{S.pv.domain=b.dataset.domain;S.pv.touched=true;pk.classList.remove('show');updatePv()});return}
   pk._onDismiss=null;
   pkbx.classList.remove('memory-box');
   const g=S.pv,today=TODAY();
@@ -691,7 +691,7 @@ function userMemoryPicker(){
 sb.onclick=()=>{
   const txt=dr.value.trim();if(!txt)return;
   const g=S.pv||Object.assign({titleManual:false},classify(txt));
-  if(!g.domain)g.domain=taskDomain({c:g.c});
+  if(!ACTIVE_TASK_DOMAINS[g.domain])g.domain=g.c===5?'home':'personal';
   const ttl=(g.titleManual&&g.title)?g.title:titleFrom(txt);
   const today=TODAY();
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);

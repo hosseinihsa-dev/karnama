@@ -1,0 +1,16 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const storage={},ctx=vm.createContext({console,Date,Intl,setTimeout,clearTimeout,localStorage:{getItem:k=>storage[k]||null,setItem:(k,v)=>storage[k]=v}});
+vm.runInContext(['core.js','graph.js'].map(f=>fs.readFileSync(f,'utf8')).join('\n'),ctx);
+vm.runInContext(`S.tasks=[{id:1,c:4,title:'legacy work'},{id:2,c:12,title:'explicit work',meta:{domain:'work'}},{id:3,c:4,title:'explicit home',meta:{domain:'home',prerequisiteTaskIds:[1,2]}},{id:4,c:12,title:'personal'}];`,ctx);
+assert.equal(vm.runInContext('removeWorkTasks()',ctx),2);
+assert.equal(vm.runInContext('S.tasks.length',ctx),2);
+assert.equal(vm.runInContext('graphReadiness(S.tasks[0]).kind',ctx),'waiting');
+assert.equal(JSON.parse(storage['karnama.removed-work.v69']).tasks.length,2);
+assert.equal(JSON.parse(storage['karnama.v1']).tasks.length,2);
+assert.equal(vm.runInContext('removeWorkTasks()',ctx),0);
+assert.equal(vm.runInContext("Object.keys(ACTIVE_TASK_DOMAINS).join(',')",ctx),'home,personal');
+assert.equal(vm.runInContext("domainPreference({c:5},'2026-10-14',600)",ctx),0);
+vm.runInContext("S.tasks=[{id:5,c:4,title:'preserve on failure'}];localStorage.setItem=()=>{throw Error('storage full')}",ctx);
+assert.throws(()=>vm.runInContext('removeWorkTasks()',ctx));
+assert.equal(vm.runInContext('S.tasks.length',ctx),1);
+console.log('Work removal: explicit/legacy classification, archive, dependencies, idempotence and storage failure passed');
