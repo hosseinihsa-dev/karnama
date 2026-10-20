@@ -457,8 +457,8 @@ const ov=document.getElementById('ov'),dr=document.getElementById('draft'),
 function openSheet(id){
   const t=id?byId(id):null;
   S.edit=t?t.id:null;
-  document.getElementById('sh-title').textContent=t?'ویرایش کار':'چی تو ذهنته؟';
-  sb.textContent=t?'ذخیره‌ی تغییرات':'بسپار به کارنما';
+  document.getElementById('sh-title').textContent=t?'ویرایش کار':'افزودن کار';
+  sb.textContent=t?'ذخیره‌ی تغییرات':'ثبت کار';
   document.getElementById('sh-del').style.display=t?'block':'none';
   if(t){dr.value=t.note||t.title;
     const auto=titleFrom(t.note||t.title);
@@ -474,7 +474,7 @@ document.getElementById('scrim').onclick=closeSheet;
 function updatePv(){
   const txt=dr.value.trim();
   sb.classList.toggle('on',txt.length>0);
-  if(txt.length<=2&&!S.pv){pv.classList.remove('show');S.pv=null;return}
+  
   if(!S.pv)S.pv=Object.assign({touched:false,titleManual:false},classify(txt));
   else if(!S.pv.touched&&!S.edit){
     const keep=S.pv.titleManual?S.pv.title:null;
@@ -485,13 +485,18 @@ function updatePv(){
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
   if(!ACTIVE_TASK_DOMAINS[g.domain])g.domain=g.c===5?'home':'personal';
   document.getElementById('task-time').value=g.time||'';
+  const parts=(g.time||':').split(':');document.getElementById('task-hour').value=parts[0]?fa(parts[0]):'';document.getElementById('task-minute').value=parts[1]?fa(parts[1]):'';
+  document.getElementById('task-no-time').setAttribute('aria-pressed',String(!g.time));
+  const scheduleIcon=path=>`<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="${path}"/></svg>`;
   pc.innerHTML=
-    `<button class="chip c-nu" data-f="date">${dl}</button>`+
-    `<button class="chip c-nu" data-f="domain">${TASK_DOMAINS[g.domain].icon} ${TASK_DOMAINS[g.domain].label}</button>`+
-    `<button class="chip c-inf" data-f="rep">${g.rep?repLabel(g):'بدون تکرار'}</button>`+
-    (g.rep?`<button class="chip c-inf" data-f="until">${g.until?'تا '+fa(jdate(g.until)):'بدون پایان'}</button>`:'');
+    `<button class="chip c-nu" data-f="date">${scheduleIcon('M5 5h14v16H5zM8 3v4m8-4v4M5 10h14')}<span>${dl}</span></button>`+
+    `<button class="chip c-nu" data-f="domain">${scheduleIcon(g.domain==='home'?'M3 11 12 3l9 8M5 9v12h5v-7h4v7h5V9':'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0M4 21v-2a8 8 0 0 1 16 0v2')}<span>${TASK_DOMAINS[g.domain].label}</span></button>`+
+    `<button class="chip c-inf" data-f="rep">${scheduleIcon('M20 7H8a5 5 0 0 0-5 5m17-9v4h-4M4 17h12a5 5 0 0 0 5-5M4 21v-4h4')}<span>${g.rep?repLabel(g):'بدون تکرار'}</span></button>`;
+  document.getElementById('schedule-extra').innerHTML=g.rep?`<button class="chip c-inf" data-f="until">${g.until?'تا '+fa(jdate(g.until)):'بدون پایان'}</button>`:'';
+  document.querySelectorAll('#schedule-extra [data-f]').forEach(b=>b.onclick=()=>picker(b.dataset.f));
   pc.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>picker(b.dataset.f));
   const tl=document.getElementById('pv-title');
+  tl.style.display=txt?'flex':'none';
   tl.innerHTML=`<span>عنوان: </span><b>${esc(S.pv.titleManual&&S.pv.title?S.pv.title:titleFrom(txt))}</b><i>ویرایش</i>`;
   tl.onclick=()=>{
     const cur=S.pv.titleManual&&S.pv.title?S.pv.title:titleFrom(dr.value.trim());
@@ -505,6 +510,19 @@ document.getElementById('task-time').onchange=e=>{
   S.pv.time=e.target.value||null;if(S.pv.time)S.pv.s=slotOfTime(S.pv.time);
   S.pv.touched=true;updatePv();
 };
+
+function setTaskClock(part,value,delta=0){
+  const g=S.pv||(S.pv=Object.assign({touched:false},classify(dr.value.trim())));
+  const [h,m]=(g.time||'00:00').split(':').map(Number),limit=part==='hour'?24:60;
+  const digits=String(value).replace(/[۰-۹]/g,c=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(c)).replace(/[٠-٩]/g,c=>'٠١٢٣٤٥٦٧٨٩'.indexOf(c));
+  if(!delta&&!/^\d{1,2}$/.test(digits)){toast('ساعت یا دقیقه معتبر وارد کن.');updatePv();return}
+  const v=delta?((part==='hour'?h:m)+delta+limit)%limit:Number(digits);
+  if(v<0||v>=limit){toast(part==='hour'?'ساعت باید بین ۰ و ۲۳ باشد.':'دقیقه باید بین ۰ و ۵۹ باشد.');updatePv();return}
+  g.time=String(part==='hour'?v:h).padStart(2,'0')+':'+String(part==='minute'?v:m).padStart(2,'0');g.s=slotOfTime(g.time);g.touched=true;updatePv();
+}
+document.querySelectorAll('[data-time-step]').forEach(b=>b.onclick=()=>setTaskClock(b.dataset.timePart,'',+b.dataset.timeStep));
+for(const part of ['hour','minute'])document.getElementById('task-'+part).onchange=e=>setTaskClock(part,e.target.value);
+document.getElementById('task-no-time').onclick=()=>{S.pv.time=null;S.pv.touched=true;updatePv()};
 
 /* ورود صوتی فقط متن را پر می‌کند؛ تحلیل و ذخیره دقیقاً همان مسیر ورود متنی است. */
 const mic=document.getElementById('voice-input');
