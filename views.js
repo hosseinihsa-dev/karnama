@@ -416,6 +416,19 @@ function catView(){
 }
 
 /* ================= backup / restore ================= */
+function clearAllTasks(){
+  const count=S.tasks.length;
+  if(!count){toast('فهرست کارها از قبل خالی است.');return}
+  if(!confirm(fa(`${count} کار، شامل کارهای انجام‌شده و تکرارشونده، پاک شوند؟ برنامه‌های مطالعه و تنظیمات حفظ می‌شوند. یک نسخه بازیابی محلی نگه داشته می‌شود.`)))return;
+  try{
+    localStorage.setItem('karnama.tasks-before-clear.v1',JSON.stringify({app:'karnama',at:new Date().toISOString(),tasks:S.tasks}));
+    localStorage.setItem(KEY,JSON.stringify({tasks:[]}));
+  }catch(error){toast('پاک‌کردن انجام نشد؛ ذخیره‌سازی مرورگر در دسترس نیست.',4000);return}
+  S.tasks=[];S.awaitingFollowup=false;S.followupParent=null;S.pv=null;S.edit=null;S.cat=null;S.planPreview=false;S.tab=0;
+  if(typeof ov!=='undefined')ov.classList.remove('show');
+  if(typeof pk!=='undefined'){pk.classList.remove('show');pk._onDismiss=null}
+  render();toast('همه کارها پاک شدند؛ می‌توانی از اول شروع کنی.',4000);
+}
 function doBackup(){
   const data={app:'karnama',v:7,at:new Date().toISOString(),tasks:S.tasks,learn:LEARN,study:STUDY,decision:DECISION,userMemory:USER_MEMORY,behavior:BEHAVIOR,advisorChat:S.advisorChat||[]};
   const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
@@ -761,6 +774,7 @@ document.getElementById('menu-memory').onclick=()=>{closeMenu();userMemoryPicker
 document.getElementById('side-backup').onclick=()=>{closeMenu();doBackup()};
 document.getElementById('menu-graph').onclick=()=>{closeMenu();S.tab=8;render()};
 document.getElementById('side-restore').onclick=()=>{closeMenu();if(impEl)impEl.click()};
+document.getElementById('side-clear-tasks').onclick=()=>{closeMenu();clearAllTasks()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sideMenu.classList.contains('show'))closeMenu()});
 
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
