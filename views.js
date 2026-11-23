@@ -79,13 +79,14 @@ function render(){
 
 function advisorCountdownTarget(task){
   const deadline=taskContext(task)?.deadline?.value;
-  const time=deadline?null:task.time;
+  const time=deadline||!task.time?null:String(task.time).trim()
+    .replace(/[۰-۹٠-٩]/g,digit=>String(digit.charCodeAt(0)%16));
   const date=deadline||task.date;
   if((!deadline&&!time)||typeof date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(date))return null;
   const target=fromIso(date);
   if(!Number.isFinite(+target)||iso(target)!==date)return null;
   if(time){
-    if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return null;
+    if(!/^(?:[01]?\d|2[0-3]):[0-5]\d$/.test(time))return null;
     const [hour,minute]=time.split(':').map(Number);
     target.setHours(hour,minute,0,0);
   }else{
