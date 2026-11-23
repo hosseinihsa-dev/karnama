@@ -27,3 +27,21 @@ assert.equal(evaluate(`(() => {
   const target=advisorCountdownTarget(task);
   return advisorCountdownText(target.at,target.deadline,+new Date(2026,10,23,15,45));
 })()`), '۰۰:۱۵:۰۰');
+
+const decisionContext=vm.createContext({localStorage:{getItem:()=>null}});
+const projectScripts=['core.js','memory.js','behavior.js','graph.js','decision.js'];
+const advisor=source.slice(source.indexOf('function advisorCountdownTarget('),source.indexOf('function tasksView('));
+vm.runInContext(projectScripts.map(file=>fs.readFileSync(file,'utf8')).join('\n')+'\n'+advisor,decisionContext);
+vm.runInContext(`
+  S.space='work';
+  const today='2026-11-23';
+  const meeting={id:50,title:'جلسهٔ انبارداری',c:4,p:1,s:1,date:today,time:'16:00',done:false};
+  S.tasks=[meeting,{...meeting,id:51,title:'کار منزل',meta:{domain:'home'},time:'15:50'},
+    {...meeting,id:52,title:'جلسهٔ بعدی',time:'17:00'}];
+`,decisionContext);
+const check = expression => vm.runInContext(expression,decisionContext);
+assert.equal(check("chooseNextTask(tasksInSpace(),today,945)"),null);
+assert.equal(check("advisorUpcomingTask(today,945).id"),50);
+assert.match(check("advisorWaitingCard(today,945)"),/جلسهٔ انبارداری.*data-upcoming="true".*دیدن کارهای ثبت‌شده/);
+assert.equal(check("advisorUpcomingTask(today,960).id"),52);
+assert.equal(check("chooseNextTask(tasksInSpace(),today,960).task.id"),50);

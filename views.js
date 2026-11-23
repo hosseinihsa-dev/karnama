@@ -68,6 +68,7 @@ function render(){
       else if(a==='decisionReject')decisionRejectPicker(id,el.dataset.key);
       else if(a==='decisionDone'){const x=decisionCandidates(S.tab===0?advisorTaskPool():tasksInSpace(),TODAY()).find(t=>t.id===id&&decisionKey(t)===(el.dataset.key||decisionKey(t)))||byId(id);if(x&&x.meta&&x.meta.advisorStudy){const p=studyById(x.meta.studyId),st=p&&studyStats(p);if(p&&st.target){S.awaitingFollowup=true;addStudyProgress(p.id,st.target);askFollowupTask(x)}}else if(x)toggle(x.id,x.key||TODAY())}
       else if(a==='addTask')openSheet();
+      else if(a==='allTasks'){S.tab=7;S.taskMode='all';render()}
       else if(a==='taskMode'){S.taskMode=el.dataset.v;render()}
       else if(a==='planPreview'){S.planPreview=true;render()}
       else if(a==='planClose'){S.planPreview=false;S.tab=0;render()}
@@ -106,25 +107,57 @@ function advisorCountdownText(at,deadline,now=Date.now()){
 
 function updateAdvisorCountdown(){
   const counter=document.getElementById('advisor-countdown');
-  if(counter)counter.textContent=advisorCountdownText(+counter.dataset.at,counter.dataset.deadline==='true');
+  if(!counter)return;
+  if(counter.dataset.upcoming==='true'&&Date.now()>=Number(counter.dataset.at)){render();return}
+  counter.textContent=advisorCountdownText(+counter.dataset.at,counter.dataset.deadline==='true');
+}
+
+function advisorUpcomingTask(today,nowMin=decisionNowMinutes()){
+  return decisionCandidates(tasksInSpace(),today,nowMin)
+    .filter(task=>task.date===today&&task.time&&tmin(task)>nowMin
+      &&assessNowFeasibility(task,{date:today,nowMin:tmin(task)}).status===FEASIBLE_NOW.YES)
+    .sort((a,b)=>tmin(a)-tmin(b))[0]||null;
+}
+
+function advisorCountdownMarkup(target,upcoming=false){
+  if(!target)return '<p>ساعت یا مهلتی ثبت نشده است.</p>';
+  return `<p class="advisor-countdown"><span>${target.deadline?'تا پایان مهلت':'تا زمان انجام'}</span><bdi id="advisor-countdown" data-at="${target.at}" data-deadline="${target.deadline}" data-upcoming="${upcoming}">${advisorCountdownText(target.at,target.deadline)}</bdi></p>`;
+}
+
+function advisorWaitingCard(today,nowMin){
+  const upcoming=advisorUpcomingTask(today,nowMin);
+  const allTasks='<button class="primary" data-act="allTasks" data-id="0">دیدن کارهای ثبت‌شده</button>';
+  if(upcoming){
+    const target=advisorCountdownTarget({date:upcoming.date,time:upcoming.time});
+    return `<div class="advisor-proposal"><span>کار زمان‌دار بعدی</span><h2>${esc(upcoming.title)}</h2>${domainChip(upcoming)} <span class="chip c-nu">ساعت <bdi>${esc(fa(upcoming.time))}</bdi></span>${advisorCountdownMarkup(target,true)}<div>${allTasks}</div></div>`;
+  }
+  const hasTasks=tasksInSpace().some(task=>!task.done);
+  const otherSpace=S.space==='home'?'work':'home';
+  const hasOtherTasks=S.tasks.some(task=>!task.done&&taskSpace(task)===otherSpace);
+  const detail=hasTasks?'کارهای ثبت‌شده را در فهرست کارها ببین.':hasOtherTasks
+    ?`برای دیدن کارهای ثبت‌شده، تب «${otherSpace==='work'?'کارهای محل کار':'کارهای خانه'}» را باز کن.`
+    :'با دکمهٔ زیر یک کار تازه اضافه کن.';
+  return `<div class="advisor-proposal empty"><h2>فعلاً کاری آمادهٔ انجام نیست</h2><p>${detail}</p>${hasTasks?`<div>${allTasks}</div>`:''}</div>`;
 }
 
 function advisorHome(overdue,list,doneN,today){
   const x=chooseAdvisorTask(today);
   if(x)recordSuggestedBehavior(x.task,x);
   const target=x&&advisorCountdownTarget(x.task);
-  const countdown=target
-    ? `<p class="advisor-countdown"><span>${target.deadline?'تا پایان مهلت':'تا زمان انجام'}</span><bdi id="advisor-countdown" data-at="${target.at}" data-deadline="${target.deadline}">${advisorCountdownText(target.at,target.deadline)}</bdi></p>`
-    : '<p>ساعت یا مهلتی ثبت نشده است.</p>';
-  const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2>${domainChip(x.task)} ${x.task.time?`<time class="chip c-nu" datetime="${esc(x.task.time)}">ساعت <bdi>${esc(fa(x.task.time))}</bdi></time>`:''}${countdown}<div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionDone" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">✓ انجام شد</button></div></div>`:`<div class="advisor-proposal empty"><h2>فعلاً پیشنهاد مشخصی ندارم</h2><p>با دکمه زیر یک کار تازه اضافه کن.</p></div>`;
+  const countdown=advisorCountdownMarkup(target);
+  const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2>${domainChip(x.task)} ${x.task.time?`<time class="chip c-nu" datetime="${esc(x.task.time)}">ساعت <bdi>${esc(fa(x.task.time))}</bdi></time>`:''}${countdown}<div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionDone" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">✓ انجام شد</button></div></div>`:advisorWaitingCard(today);
   return `<section class="coach-home"><div class="coach-orb"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 7c6 0 10 3 13 8 3-5 7-8 13-8v7c-6 0-9 4-9 10v10h-8V24c0-6-3-10-9-10z"/></svg></div><h2 class="coach-question">قدم بعدی امروز</h2>${proposal}<button class="home-add-task" data-act="addTask" data-id="0"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>افزودن کار</span></button></section>`;
 }
 
 function tasksView(overdue,list,doneN,today){
-  const modes=[['today','امروز'],['tomorrow','فردا'],['dates','تاریخ‌ها'],['done','انجام‌شده']];
+  const modes=[['today','امروز'],['tomorrow','فردا'],['dates','تاریخ‌ها'],['done','انجام‌شده'],['all','همه']];
   let h=`<div class="tasks-head"><div><span>مدیریت</span><h2>همه کارها</h2></div><button data-act="backup" data-id="0">پشتیبان</button></div><div class="task-modes">${modes.map(x=>`<button class="${S.taskMode===x[0]?'on':''}" data-act="taskMode" data-v="${x[0]}" data-id="0">${x[1]}</button>`).join('')}</div>`;
   if(S.taskMode==='tomorrow')return h+tomorrowView();
   if(S.taskMode==='dates')return h+monthView();
+  if(S.taskMode==='all'){
+    const tasks=tasksInSpace().sort((a,b)=>Number(a.done)-Number(b.done)||a.date.localeCompare(b.date)||bySlot(a,b));
+    return h+`<div class="list">${tasks.length?tasks.map((task,index)=>`<div class="tasks-overdue-note">${fa(jdate(task.date))}</div>${taskCard(task,index)}`).join(''):'<div class="empty">هنوز کاری در این فضا ثبت نشده است.</div>'}</div>`;
+  }
   if(S.taskMode==='done'){
     const done=tasksInSpace().filter(t=>!t.rep&&t.done).sort((a,b)=>b.date.localeCompare(a.date));
     return h+`<div class="list">${done.length?done.map((t,i)=>taskCard(Object.assign({},t,{done:true,key:t.date}),i)).join(''):'<div class="empty">هنوز کار انجام‌شده‌ای برای نمایش نیست.</div>'}</div>`;
