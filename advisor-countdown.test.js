@@ -18,3 +18,12 @@ assert.equal(evaluate('advisorCountdownText(3661000,true,0)'), '۰۱:۰۱:۰۱')
 assert.equal(evaluate('advisorCountdownText(90001000,true,0)'), '۱ روز · ۰۱:۰۰:۰۱');
 assert.equal(evaluate('advisorCountdownText(1000,true,1000)'), 'مهلت گذشته');
 assert.equal(evaluate('advisorCountdownText(1000,false,1001)'), 'زمان انجام رسیده');
+assert.equal(evaluate("classify('جلسه انبارداری ساعت ۴').time"), '16:00');
+assert.equal(evaluate("classify('جلسه انبارداری ساعت ۴ صبح').time"), '4:00');
+assert.equal(evaluate("classify('جلسه انبارداری ساعت 04:00').time"), '4:00');
+assert.equal(evaluate("mergeSeries([{note:'جلسه انبارداری ساعت ۴',time:'04:00'}])[0].time"), '04:00');
+assert.equal(evaluate(`(() => {
+  const [task]=mergeSeries([{note:'جلسه انبارداری ساعت ۴',date:'2026-11-23',time:'4:00'}]);
+  const target=advisorCountdownTarget(task);
+  return advisorCountdownText(target.at,target.deadline,+new Date(2026,10,23,15,45));
+})()`), '۰۰:۱۵:۰۰');

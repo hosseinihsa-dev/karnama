@@ -158,10 +158,26 @@ function taskSpace(task){
 }
 const tasksInSpace=()=>S.tasks.filter(task=>taskSpace(task)===S.space);
 
+// A conversational meeting time such as «جلسه ساعت ۴» defaults to the afternoon.
+// A named part of the day or a 24-hour time keeps its explicit meaning.
+function bareAfternoonMeetingHour(text){
+  const digits=String(text||'').replace(/[۰-۹٠-٩]/g,digit=>String(digit.charCodeAt(0)%16));
+  if(!/جلسه|میتینگ/.test(digits)||/صبح|بامداد|سحر|ظهر|عصر|شب/.test(digits))return null;
+  const match=digits.match(/ساعت\s*([1-6])(?!\d|\s*[:.٫]\s*\d)/);
+  return match?Number(match[1]):null;
+}
+
+function restoreMeetingTime(task){
+  const hour=bareAfternoonMeetingHour(task.note||task.title);
+  // Older text entry saved a bare hour without the leading zero. Manual times are padded.
+  if(hour===null||task.time!==hour+':00')return task;
+  return {...task,time:(hour+12)+':00',s:1};
+}
+
 /* merge duplicates left over from the old repeat logic: one series per repeating task */
 function mergeSeries(tasks){
   const seen={},out=[];
-  (tasks||[]).forEach(t=>{
+  (tasks||[]).map(restoreMeetingTime).forEach(t=>{
     if(!t.rep){out.push(t);return}
     const k=[taskSpace(t),t.title,t.rep,t.c,t.s,t.p,t.time||'',t.until||''].join('|');
     if(!seen[k]){
@@ -265,6 +281,7 @@ function classify(text){
     const isMorning=/صبح/.test(t),isNoon=/ظهر/.test(t),isPm=/عصر|بعدازظهر|بعد از ظهر|شب|امشب/.test(t);
     if(isMorning&&hh===12)hh=0;
     else if((isPm||isNoon)&&hh>=1&&hh<12)hh+=12;
+    else if(hh===bareAfternoonMeetingHour(t))hh+=12;
     if(hh>=0&&hh<=23&&mm>=0&&mm<=59){
       time=hh+':'+String(mm).padStart(2,'0');
       s=hh<12?0:(hh<18?1:2);
