@@ -177,11 +177,17 @@ nav button.on span{color:#C9A227}
 #sheet{position:relative;background:#15161a;border-top:1px solid #2a2c34;border-radius:26px 26px 0 0;padding:18px 20px calc(22px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;animation:ka-up .28s cubic-bezier(.3,1,.4,1) both;max-height:92dvh;overflow-y:auto}
 .grab{width:40px;height:4px;border-radius:99px;background:#31343c;align-self:center}
 .sh-t{font:700 15px inherit;color:#F2F0EB}
-.draft-wrap{position:relative}.draft-wrap #draft{padding-left:58px}
+
 #draft{width:100%;min-height:86px;resize:none;border-radius:16px;background:#1b1d23;border:1px solid #2a2c34;padding:13px 14px;font:400 var(--text-card)/var(--lh-body) inherit;color:#EDEBE6;direction:rtl}
 #draft::placeholder{color:#5E6169}
 #draft:focus{outline:none;border-color:#3a3d46}
-#voice-input{position:absolute;left:9px;bottom:9px;width:44px;height:44px;border-radius:13px;background:#25272e;border:1px solid #353842;display:flex;align-items:center;justify-content:center;color:#c9a227}#voice-input svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}#voice-input.listening{color:#151107;background:#c9a227;box-shadow:0 0 0 5px rgba(201,162,39,.13)}#voice-input.unsupported{opacity:.38;color:#858891}
+#voice-input{width:100%;min-height:54px;margin-bottom:12px;padding:10px 16px;border-radius:14px;background:#c9a227;color:#151107;display:flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-weight:750}
+#voice-input svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#voice-input:focus-visible{outline:2px solid #f5d97d;outline-offset:3px}
+#voice-input.listening{background:#f4c84a;box-shadow:0 0 0 4px rgba(201,162,39,.18)}
+#voice-input .voice-stop,#voice-input.listening .voice-ready{display:none}
+#voice-input.listening .voice-stop{display:inline}
+#voice-input:disabled{opacity:.45}
 #prev{padding:13px 14px;border-radius:16px;background:#1b1d23;border:1px solid #2a2c34;display:none;flex-direction:column;gap:10px}
 #prev.show{display:flex}
 .pv-l{font:500 11px inherit;color:#7C7F87}
@@ -346,3 +352,6 @@ body.advisor-mode main{padding-bottom:38px}
 #task-spaces button[aria-pressed="true"]{color:#f5d97d;background:#332a16;border-color:#8b702d}
 #task-spaces button:focus-visible{outline:2px solid #f5d97d;outline-offset:-3px}
 body.work-space nav button[data-tab="5"],body.work-space #menu-study{display:none}
+
+.advisor-proposal .advisor-countdown{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px}
+.advisor-countdown bdi{color:#e3efc5;font-size:1.1rem;font-weight:750;font-variant-numeric:tabular-nums}

@@ -77,10 +77,45 @@ function render(){
   bindAdvisorChat();
 }
 
+function advisorCountdownTarget(task){
+  const deadline=taskContext(task)?.deadline?.value;
+  const time=deadline?null:task.time;
+  const date=deadline||task.date;
+  if((!deadline&&!time)||typeof date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(date))return null;
+  const target=fromIso(date);
+  if(!Number.isFinite(+target)||iso(target)!==date)return null;
+  if(time){
+    if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return null;
+    const [hour,minute]=time.split(':').map(Number);
+    target.setHours(hour,minute,0,0);
+  }else{
+    target.setHours(24,0,0,0);
+  }
+  return {at:+target,deadline:!!deadline};
+}
+
+function advisorCountdownText(at,deadline,now=Date.now()){
+  const seconds=Math.ceil((at-now)/1000);
+  if(seconds<=0)return deadline?'مهلت گذشته':'زمان انجام رسیده';
+  const days=Math.floor(seconds/86400);
+  const clock=[Math.floor(seconds/3600)%24,Math.floor(seconds/60)%60,seconds%60]
+    .map(value=>String(value).padStart(2,'0')).join(':');
+  return fa(days?days+' روز · '+clock:clock);
+}
+
+function updateAdvisorCountdown(){
+  const counter=document.getElementById('advisor-countdown');
+  if(counter)counter.textContent=advisorCountdownText(+counter.dataset.at,counter.dataset.deadline==='true');
+}
+
 function advisorHome(overdue,list,doneN,today){
   const x=chooseAdvisorTask(today);
   if(x)recordSuggestedBehavior(x.task,x);
-  const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2>${domainChip(x.task)} ${x.task.time?`<time class="chip c-nu" datetime="${esc(x.task.time)}">ساعت <bdi>${esc(fa(x.task.time))}</bdi></time>`:''}<p>${esc(x.reason)}</p><div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionDone" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">✓ انجام شد</button></div></div>`:`<div class="advisor-proposal empty"><h2>فعلاً پیشنهاد مشخصی ندارم</h2><p>با دکمه زیر یک کار تازه اضافه کن.</p></div>`;
+  const target=x&&advisorCountdownTarget(x.task);
+  const countdown=target
+    ? `<p class="advisor-countdown"><span>${target.deadline?'تا پایان مهلت':'تا زمان انجام'}</span><bdi id="advisor-countdown" data-at="${target.at}" data-deadline="${target.deadline}">${advisorCountdownText(target.at,target.deadline)}</bdi></p>`
+    : '<p>ساعت یا مهلتی ثبت نشده است.</p>';
+  const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2>${domainChip(x.task)} ${x.task.time?`<time class="chip c-nu" datetime="${esc(x.task.time)}">ساعت <bdi>${esc(fa(x.task.time))}</bdi></time>`:''}${countdown}<div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionDone" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">✓ انجام شد</button></div></div>`:`<div class="advisor-proposal empty"><h2>فعلاً پیشنهاد مشخصی ندارم</h2><p>با دکمه زیر یک کار تازه اضافه کن.</p></div>`;
   return `<section class="coach-home"><div class="coach-orb"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 7c6 0 10 3 13 8 3-5 7-8 13-8v7c-6 0-9 4-9 10v10h-8V24c0-6-3-10-9-10z"/></svg></div><h2 class="coach-question">قدم بعدی امروز</h2>${proposal}<button class="home-add-task" data-act="addTask" data-id="0"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>افزودن کار</span></button></section>`;
 }
 
@@ -192,7 +227,7 @@ function decisionRejectPicker(id,key){
 function checkTaskReminders(){
   const now=new Date();for(const task of S.tasks){const meta=task.meta||{};if(!task.done&&!graphReadiness(task).blocked&&meta.reminderAt&&!meta.reminderShown&&new Date(meta.reminderAt)<=now){meta.reminderShown=true;save();toast('وقت انجام «'+task.title+'» رسیده است.',7000);if(window.Notification&&Notification.permission==='granted')navigator.serviceWorker.ready.then(r=>r.showNotification('کارنما',{body:task.title,tag:'task-'+task.id})).catch(()=>{});render();break}}
 }
-setInterval(checkTaskReminders,30000);setTimeout(checkTaskReminders,1500);
+setInterval(updateAdvisorCountdown,1000);setInterval(checkTaskReminders,30000);setTimeout(checkTaskReminders,1500);
 function advisorNextText(){const n=chooseAdvisorTask();return n?`پیشنهاد بعدی من «${n.task.title}» است؛ ${n.reason}.`:'فعلاً کار مشخص دیگری ندارم که با اطمینان پیشنهاد بدهم.'}
 function advisorTaskReference(text,current){
   const n=norm(text),active=tasksInSpace().filter(t=>!t.done);if(/(?:این|همین|این یکی|همین یکی)s*(?:کار)?/.test(n)&&current)return current;
@@ -484,7 +519,7 @@ function openSheet(id){
     S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,every:t.every||null,until:t.until||null,date:t.date,time:t.time||null,
           title:t.title,titleManual:t.title!==auto,touched:true,domain:taskDomain(t)};}
   else {dr.value='';S.pv=null}
-  updatePv();document.getElementById('task-time').value=S.pv?.time||'';ov.classList.add('show');setTimeout(()=>dr.focus(),60);
+  updatePv();document.getElementById('task-time').value=S.pv?.time||'';ov.classList.add('show');
 }
 function closeSheet(){cancelTaskVoice();ov.classList.remove('show');dr.blur();if(S.awaitingFollowup){S.awaitingFollowup=false;S.followupParent=null;render()}}
 document.getElementById('fab').onclick=()=>openSheet();
@@ -548,7 +583,7 @@ const mic=document.getElementById('voice-input');
 let cancelTaskVoice=()=>{};
 if(mic){
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SpeechRecognition){mic.classList.add('unsupported');mic.title='تشخیص گفتار در این مرورگر پشتیبانی نمی‌شود'}
+  if(!SpeechRecognition){mic.disabled=true;mic.title='تشخیص گفتار در این مرورگر پشتیبانی نمی‌شود'}
   else{
     let recognition=null, retryTimer=null, listening=false, silentEnds=0;
     const finish=()=>{
@@ -557,7 +592,7 @@ if(mic){
       retryTimer=null;
       recognition=null;
       mic.classList.remove('listening');
-      mic.setAttribute('aria-label','ورود صوتی کار');
+      mic.setAttribute('aria-label','ضبط صدا');
     };
     const start=()=>{
       const session=new SpeechRecognition();
@@ -617,7 +652,7 @@ if(mic){
       listening=true;
       silentEnds=0;
       mic.classList.add('listening');
-      mic.setAttribute('aria-label','پایان ورود صوتی');
+      mic.setAttribute('aria-label','پایان ضبط');
       start();
     };
   }
