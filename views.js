@@ -6,10 +6,12 @@ function taskCard(t,i){
       <div class="tmid"><div data-act="edit" data-id="${t.id}"><div class="ttl ${t.done?'done':''}">${esc(t.title)}${t.doseAll>1?` <span style="color:#8A8D95;font-weight:500">(نوبت ${fa(t.doseN)} از ${fa(t.doseAll)})</span>`:''}</div>${t.note&&t.note!==t.title?`<div class="note">${esc(t.note)}</div>`:''}</div><div class="chips">${taskChips(t)}</div></div>
       <span class="rank">${fa(String(i+1).padStart(2,'0'))}</span></div>`;
 }
+function spaceInstancesOn(date){return instOn(date,tasksInSpace())}
+
 function advisorTaskPool(date=TODAY()){
   const studyDue=p=>p&&studyStats(p,date).target>0;
-  const tasks=S.tasks.filter(t=>!t.meta?.advisorStudy||studyDue(studyById(t.meta.studyId))),now=new Date(),slot=slotOfTime(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
-  (STUDY||[]).filter(studyDue).forEach(p=>tasks.push({id:-Math.abs(+p.id||1),title:`مطالعه ${p.title}`,note:`برنامه مطالعه ${p.title}`,c:1,p:1,s:slot,date,done:false,rep:null,time:null,meta:{advisorStudy:true,studyId:p.id}}));
+  const tasks=tasksInSpace().filter(t=>!t.meta?.advisorStudy||studyDue(studyById(t.meta.studyId))),now=new Date(),slot=slotOfTime(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
+  (S.space==='home'?STUDY||[]:[]).filter(studyDue).forEach(p=>tasks.push({id:-Math.abs(+p.id||1),title:`مطالعه ${p.title}`,note:`برنامه مطالعه ${p.title}`,c:1,p:1,s:slot,date,done:false,rep:null,time:null,meta:{advisorStudy:true,studyId:p.id}}));
   return tasks;
 }
 function chooseAdvisorTask(date=TODAY()){
@@ -22,10 +24,14 @@ function render(){
   if(S.awaitingFollowup)return;
   const today=TODAY();
   captureMissedDeadlineBehaviors(S.tasks,today);
-  const overdue=S.tasks.filter(t=>!t.rep&&!t.done&&t.date<today).sort(bySlot);
-  const list=instOn(today);
+  const overdue=tasksInSpace().filter(t=>!t.rep&&!t.done&&t.date<today).sort(bySlot);
+  const list=spaceInstancesOn(today);
   const doneN=list.filter(t=>t.done).length;
   document.body.classList.toggle('advisor-mode',S.tab===0);
+  document.body.classList.toggle('work-space',S.space==='work');
+  document.querySelectorAll('#task-spaces button').forEach(button=>{
+    button.setAttribute('aria-pressed',String(button.dataset.space===S.space));
+  });
   const greetEl=document.getElementById('greet'),subEl=document.getElementById('sub');if(greetEl)greetEl.textContent=S.tab===0?'کارنما':S.tab===7?'کارها':'سلام! امروز مال توست';if(subEl)subEl.textContent=S.tab===0?fa(`${WD[wdIndex(today)]} ${jdate(today)}`):fa(`${list.length} کار برای امروز · ${doneN} انجام شده`);
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',+b.dataset.tab===S.tab));
   const v=document.getElementById('view');
@@ -56,11 +62,11 @@ function render(){
       else if(a==='studyExtend'){const p=studyById(id);if(p){p.endDate=nextStudyDate(p,addDays(TODAY(),1),6);saveStudy();render();toast('مهلت مطالعه هفت جلسه تمدید شد.')}}
       else if(a==='studyDelete')removeStudyWithUndo(id);
       else if(a==='decisionStart'){
-        const x=decisionCandidates(S.tab===0?advisorTaskPool():S.tasks,TODAY()).find(t=>t.id===id&&decisionKey(t)===(el.dataset.key||decisionKey(t)))||byId(id);
+        const x=decisionCandidates(S.tab===0?advisorTaskPool():tasksInSpace(),TODAY()).find(t=>t.id===id&&decisionKey(t)===(el.dataset.key||decisionKey(t)))||byId(id);
         if(x){recordDecisionEvent('start',x);toast(`«${x.title}» را شروع کردی؛ وقتی تمام شد تیک انجام را بزن.`,3500)}
       }
       else if(a==='decisionReject')decisionRejectPicker(id,el.dataset.key);
-      else if(a==='decisionDone'){const x=decisionCandidates(S.tab===0?advisorTaskPool():S.tasks,TODAY()).find(t=>t.id===id&&decisionKey(t)===(el.dataset.key||decisionKey(t)))||byId(id);if(x&&x.meta&&x.meta.advisorStudy){const p=studyById(x.meta.studyId),st=p&&studyStats(p);if(p&&st.target){S.awaitingFollowup=true;addStudyProgress(p.id,st.target);askFollowupTask(x)}}else if(x)toggle(x.id,x.key||TODAY())}
+      else if(a==='decisionDone'){const x=decisionCandidates(S.tab===0?advisorTaskPool():tasksInSpace(),TODAY()).find(t=>t.id===id&&decisionKey(t)===(el.dataset.key||decisionKey(t)))||byId(id);if(x&&x.meta&&x.meta.advisorStudy){const p=studyById(x.meta.studyId),st=p&&studyStats(p);if(p&&st.target){S.awaitingFollowup=true;addStudyProgress(p.id,st.target);askFollowupTask(x)}}else if(x)toggle(x.id,x.key||TODAY())}
       else if(a==='addTask')openSheet();
       else if(a==='taskMode'){S.taskMode=el.dataset.v;render()}
       else if(a==='planPreview'){S.planPreview=true;render()}
@@ -84,7 +90,7 @@ function tasksView(overdue,list,doneN,today){
   if(S.taskMode==='tomorrow')return h+tomorrowView();
   if(S.taskMode==='dates')return h+monthView();
   if(S.taskMode==='done'){
-    const done=S.tasks.filter(t=>!t.rep&&t.done).sort((a,b)=>b.date.localeCompare(a.date));
+    const done=tasksInSpace().filter(t=>!t.rep&&t.done).sort((a,b)=>b.date.localeCompare(a.date));
     return h+`<div class="list">${done.length?done.map((t,i)=>taskCard(Object.assign({},t,{done:true,key:t.date}),i)).join(''):'<div class="empty">هنوز کار انجام‌شده‌ای برای نمایش نیست.</div>'}</div>`;
   }
   const sorted=[...list].sort(bySlot);if(overdue.length)h+=`<div class="tasks-overdue-note">${fa(overdue.length)} کار عقب‌افتاده هم پایین فهرست امروز دیده می‌شود.</div>`;
@@ -137,7 +143,7 @@ function todayView(overdue,list,doneN,today){
   return h;
 }
 
-function decisionPanel(today,x=chooseNextTask(S.tasks,today),advisor=false){
+function decisionPanel(today,x=chooseNextTask(tasksInSpace(),today),advisor=false){
   if(!x)return `<section class="decision-card empty-decision ${advisor?'advisor-decision':''}"><div class="decision-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V18h8v-2.3A7 7 0 0 0 12 3m-3 18h6"/></svg><span>الان چیکار کنم؟</span></div><p>فعلاً کار مشخصی ندارم که با اطمینان پیشنهاد بدهم.</p></section>`;
   const t=x.task,key=decisionKey(t),when=t.time?` · ${fa(t.time)}`:'';
   recordSuggestedBehavior(t,x);
@@ -158,7 +164,7 @@ function postponeSuggestedTask(t,date,time){
   base.date=date;base.time=time;base.s=time?slotOfTime(time):base.s;base.rem=true;base.meta=Object.assign({},base.meta||{},{reminderAt:date+(time?'T'+time: 'T09:00'),reminderShown:false});save();return base;
 }
 function decisionRejectPicker(id,key){
-  const t=decisionCandidates(S.tab===0?advisorTaskPool():S.tasks,TODAY()).find(x=>x.id===id&&decisionKey(x)===key)||byId(id);if(!t)return;
+  const t=decisionCandidates(S.tab===0?advisorTaskPool():tasksInSpace(),TODAY()).find(x=>x.id===id&&decisionKey(x)===key)||byId(id);if(!t)return;
   pk._onDismiss=null;pk.classList.remove('cat-mode');pkbx.classList.remove('cat-mode','memory-box');
   const finish=()=>{pk.classList.remove('show');save();render()};
   let deferDate=addDays(TODAY(),1),deferTime='09:00';
@@ -176,7 +182,7 @@ function decisionRejectPicker(id,key){
   };
   const prerequisite=()=>{
     pkbx.innerHTML='<h4>اول چه کاری باید انجام شود؟</h4><div class="decision-custom"><label for="prerequisite-text">پیش‌نیاز را طبیعی توضیح بده</label><textarea id="prerequisite-text" placeholder="مثلاً اول باید فایل‌ها را از مرتضی بگیرم"></textarea><button id="prerequisite-save">ساخت پیش‌نیاز و تغییر پیشنهاد</button></div>';
-    pkbx.querySelector('#prerequisite-save').onclick=()=>{const text=pkbx.querySelector('#prerequisite-text').value.trim();if(text.length<3){toast('پیش‌نیاز را بنویس.',2500);return}const base=byId(t.id);if(!base){toast('پیش‌نیاز برای کارهای عادی قابل ثبت است.',3000);return}const parsed=classify(text),title=titleFrom(text.replace(/^اول\s+(?:باید\s+)?/,''));let task=S.tasks.find(x=>!x.done&&x.id!==base.id&&norm(x.title)===norm(title));if(!task){task={id:Date.now(),title,note:text,c:parsed.c===11?12:parsed.c,p:0,s:parsed.s,date:TODAY(),time:parsed.time,done:false,rep:null,meta:parsed.meta};if(task.meta.context)task.meta.context.prerequisite=null;S.tasks.push(task)}setExplicitTaskPriority(task,'پیش‌نیاز کار «'+base.title+'»');base.meta=Object.assign({},base.meta||{},{prerequisiteTaskId:task.id});recordDecisionEvent('reject',t,{code:'blocked',text,prerequisiteTaskId:task.id});finish();toast('پیش‌نیاز ساخته شد؛ کار اصلی تا انجام آن کنار گذاشته شد.',4000)};
+    pkbx.querySelector('#prerequisite-save').onclick=()=>{const text=pkbx.querySelector('#prerequisite-text').value.trim();if(text.length<3){toast('پیش‌نیاز را بنویس.',2500);return}const base=byId(t.id);if(!base){toast('پیش‌نیاز برای کارهای عادی قابل ثبت است.',3000);return}const parsed=classify(text),title=titleFrom(text.replace(/^اول\s+(?:باید\s+)?/,''));let task=tasksInSpace().find(x=>!x.done&&x.id!==base.id&&norm(x.title)===norm(title));if(!task){task={id:Date.now(),title,note:text,c:parsed.c===11?12:parsed.c,p:0,s:parsed.s,date:TODAY(),time:parsed.time,done:false,rep:null,meta:{...parsed.meta,domain:S.space}};if(task.meta.context)task.meta.context.prerequisite=null;S.tasks.push(task)}setExplicitTaskPriority(task,'پیش‌نیاز کار «'+base.title+'»');base.meta=Object.assign({},base.meta||{},{prerequisiteTaskId:task.id});recordDecisionEvent('reject',t,{code:'blocked',text,prerequisiteTaskId:task.id});finish();toast('پیش‌نیاز ساخته شد؛ کار اصلی تا انجام آن کنار گذاشته شد.',4000)};
   };
   pkbx.innerHTML='<h4>چرا الآن نمی‌تونی؟</h4><button class="op" id="reject-time">زمان دیگری انجام می‌دهم</button><button class="op" id="reject-prerequisite">اول یک کار دیگر لازم است</button><button class="op" id="reject-energy">انرژی ندارم؛ فردا</button>';
   pkbx.querySelector('#reject-time').onclick=()=>schedule();pkbx.querySelector('#reject-prerequisite').onclick=prerequisite;
@@ -189,7 +195,7 @@ function checkTaskReminders(){
 setInterval(checkTaskReminders,30000);setTimeout(checkTaskReminders,1500);
 function advisorNextText(){const n=chooseAdvisorTask();return n?`پیشنهاد بعدی من «${n.task.title}» است؛ ${n.reason}.`:'فعلاً کار مشخص دیگری ندارم که با اطمینان پیشنهاد بدهم.'}
 function advisorTaskReference(text,current){
-  const n=norm(text),active=S.tasks.filter(t=>!t.done);if(/(?:این|همین|این یکی|همین یکی)s*(?:کار)?/.test(n)&&current)return current;
+  const n=norm(text),active=tasksInSpace().filter(t=>!t.done);if(/(?:این|همین|این یکی|همین یکی)s*(?:کار)?/.test(n)&&current)return current;
   const ignored=new Set(['نه','ولی','اما','به','نظرم','فکر','میکنم','می‌کنم','کار','اون','آن','این','خیلی','واقعا','واقعاً','مهم','مهمتره','مهم‌تره','اولویت','بالاتره','بالاتر','بیشتره','بیشتر','چون','رو','را']);
   const words=n.replace(/[؟?،,.؛:!]/g,' ').split(/\s+/).map(x=>x.replace(/‌/g,'')).filter(x=>x.length>1&&!ignored.has(x));
   let best=null,bestScore=0;for(const task of active){const hay=norm(`${task.title} ${task.note||''}`).replace(/‌/g,''),score=words.reduce((s,w)=>s+(hay.includes(w)?Math.max(2,w.length):0),0)+(words.length&&hay.includes(words.join(' '))?12:0);if(score>bestScore){best=task;bestScore=score}}
@@ -211,7 +217,7 @@ function advisorTaskIntent(text){
 }
 function addTaskFromAdvisor(text){
   const g=Object.assign({titleManual:false},classify(text)),title=titleFrom(text)||text.trim();if(g.c===11&&!/(ایده|فکر|شاید|یادداشت)/.test(text))g.c=12;
-  const task={id:Date.now(),title,note:text.trim(),c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0,meta:Object.assign({},g.meta||{})};
+  const task={id:Date.now(),title,note:text.trim(),c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0,meta:{...g.meta,domain:S.space}};
   if(duplicateOf(task))return {duplicate:true,task};
   S.tasks.push(task);const question=detectImportantAmbiguity(task),entry=question?registerClarificationQuestion(task,question):null;save();return {task,question,entry};
 }
@@ -226,7 +232,7 @@ function handleAdvisorMessage(raw){
     const target=advisorTaskReference(text,current);S.advisorPending=null;if(target){setExplicitTaskPriority(target,text);advisorSay('assistant',advisorPriorityReply(target))}else advisorSay('assistant','هنوز نتوانستم کار موردنظرت را پیدا کنم؛ اسمش را دقیق‌تر بگو یا از بخش «کارها» انتخابش کن.');render();return
   }
   if(/(?:مهم.?تر|اولویت\s*(?:بالاتر|بیشتر)|بالاترین\s*اولویت)/.test(text)){
-    const target=advisorTaskReference(text,current);if(target){setExplicitTaskPriority(target,text);advisorSay('assistant',advisorPriorityReply(target))}else{S.advisorPending={kind:'priority-target'};const names=S.tasks.filter(z=>!z.done).slice(0,3).map(z=>`«${z.title}»`).join('، ');advisorSay('assistant',`کدام کار را می‌گویی؟ اسمش را بگو${names?'؛ مثلاً '+names:''}.`)}render();return
+    const target=advisorTaskReference(text,current);if(target){setExplicitTaskPriority(target,text);advisorSay('assistant',advisorPriorityReply(target))}else{S.advisorPending={kind:'priority-target'};const names=tasksInSpace().filter(z=>!z.done).slice(0,3).map(z=>`«${z.title}»`).join('، ');advisorSay('assistant',`کدام کار را می‌گویی؟ اسمش را بگو${names?'؛ مثلاً '+names:''}.`)}render();return
   }
   if(/(?:این|همین).*(?:مهم نیست|کم.?اهمیت)|(?:مهم نیست|کم.?اهمیت).*(?:این|همین)/.test(text)&&current){setExplicitTaskPriority(current,text,'low');advisorSay('assistant',`اهمیت «${current.title}» را پایین‌تر ثبت کردم. ${advisorNextText()}`);render();return}
   if(advisorTaskIntent(text)){
@@ -237,8 +243,8 @@ function handleAdvisorMessage(raw){
   if(/^(سلام|سلام خوبی|خوبی|چه خبر)/.test(norm(text))){advisorSay('assistant',`سلام. حواسم به کارهایت هست؛ الآن پیشنهادم «${t.title}» است. می‌خواهی دلیلش را بگویم یا گزینه دیگری پیدا کنم؟`);render();return}
   if(/^(مرسی|ممنون|دمت گرم|باشه ممنون)/.test(norm(text))){advisorSay('assistant','خواهش می‌کنم. هر تغییری در شرایطت پیش آمد همین‌جا بگو تا پیشنهاد را دوباره تنظیم کنم.');render();return}
   if(/^(نه|نه این نه|این نه|یکی دیگه|یه چیز دیگه|پس چی)/.test(norm(text))){recordDecisionEvent('reject',t,{code:'conversation-skip',text});advisorSay('assistant',`باشه، این گزینه را فعلاً کنار گذاشتم. ${advisorNextText()}`);render();return}
-  if(/کارهای امروز|کارای امروز/.test(text)){const items=instOn(TODAY()).filter(z=>!z.done).slice(0,5);advisorSay('assistant',items.length?`امروز ${fa(items.length)} کار اولت این‌هاست: ${items.map(z=>`«${z.title}»`).join('، ')}${instOn(TODAY()).filter(z=>!z.done).length>5?' و چند کار دیگر.':'.'}`:'برای امروز کار انجام‌نشده‌ای نداری.');render();return}
-  if(/کارهای فردا|کارای فردا|فردا چی دارم/.test(text)){const items=instOn(addDays(TODAY(),1)).filter(z=>!z.done).slice(0,5);advisorSay('assistant',items.length?`برای فردا این‌ها را داری: ${items.map(z=>`«${z.title}»`).join('، ')}.`:'برای فردا هنوز کاری ثبت نکرده‌ای.');render();return}
+  if(/کارهای امروز|کارای امروز/.test(text)){const items=spaceInstancesOn(TODAY()).filter(z=>!z.done).slice(0,5);advisorSay('assistant',items.length?`امروز ${fa(items.length)} کار اولت این‌هاست: ${items.map(z=>`«${z.title}»`).join('، ')}${spaceInstancesOn(TODAY()).filter(z=>!z.done).length>5?' و چند کار دیگر.':'.'}`:'برای امروز کار انجام‌نشده‌ای نداری.');render();return}
+  if(/کارهای فردا|کارای فردا|فردا چی دارم/.test(text)){const items=spaceInstancesOn(addDays(TODAY(),1)).filter(z=>!z.done).slice(0,5);advisorSay('assistant',items.length?`برای فردا این‌ها را داری: ${items.map(z=>`«${z.title}»`).join('، ')}.`:'برای فردا هنوز کاری ثبت نکرده‌ای.');render();return}
   if(/الان چیکار|چه کار.*انجام/.test(text)){advisorSay('assistant',`پیشنهاد من «${t.title}» است؛ ${x.reason}.`);render();return}
   if(t.meta&&t.meta.advisorStudy){
     if(/چرا|دلیل/.test(text))advisorSay('assistant',`دلیل پیشنهادم اینه که ${x.reason}.`);
@@ -265,7 +271,7 @@ function handleAdvisorMessage(raw){
     if(base.rep){base.doneOn=base.doneOn||{};base.doneOn[t.key||TODAY()]=1}else base.done=true;recordTaskCompletedBehavior(base,t.key||TODAY());save();advisorSay('assistant',`ثبت شد. ${advisorNextText()}`);render();return
   }
   const moreImportant=text.match(/(?:پروژه|کار)?\s*([آ-ی‌]{2,}(?:\s+[آ-ی‌]{2,}){0,2})\s+مهم.?تر/);
-  if(moreImportant){const needle=norm(moreImportant[1]),target=S.tasks.find(z=>z.id!==base.id&&norm(z.title).includes(needle));if(target){target.p=0;target.meta=target.meta&&typeof target.meta==='object'?target.meta:{};target.meta.importance='high';target.meta.importanceReason=text;if(/مهم نیست/.test(text))base.p=2;save();advisorSay('assistant',`اولویت «${target.title}» را بالاتر ثبت کردم. ${advisorNextText()}`);render();return}}
+  if(moreImportant){const needle=norm(moreImportant[1]),target=tasksInSpace().find(z=>z.id!==base.id&&norm(z.title).includes(needle));if(target){target.p=0;target.meta=target.meta&&typeof target.meta==='object'?target.meta:{};target.meta.importance='high';target.meta.importanceReason=text;if(/مهم نیست/.test(text))base.p=2;save();advisorSay('assistant',`اولویت «${target.title}» را بالاتر ثبت کردم. ${advisorNextText()}`);render();return}}
   if(/مهم نیست|کم.?اهمیت/.test(text)){
     base.p=2;base.meta=base.meta&&typeof base.meta==='object'?base.meta:{};base.meta.importance='low';base.meta.importanceReason=text;save();advisorSay('assistant',`اهمیت «${base.title}» را اصلاح کردم. ${advisorNextText()}`);render();return
   }
@@ -327,7 +333,7 @@ function plannerView(list,d){
 
 function tomorrowView(){
   const d=addDays(TODAY(),1);
-  const list=instOn(d);
+  const list=spaceInstancesOn(d);
   const sorted=[...list].sort(bySlot);
   let h=`<div class="dayhead">فردا — ${fa(WD[wdIndex(d)]+' '+jdate(d))} · ${fa(list.length)} کار</div>`;
   const books=STUDY.filter(p=>studyRemaining(p)>0&&studyActive(p,d));
@@ -344,7 +350,7 @@ function tomorrowView(){
 }
 
 function dayList(d){
-  const dt=instOn(d).sort(bySlot);
+  const dt=spaceInstancesOn(d).sort(bySlot);
   const books=STUDY.filter(p=>studyRemaining(p)>0&&studyActive(p,d));
   let h=`<div class="dayhead">${fa(WD[wdIndex(d)]+' '+jdate(d))} — ${fa(dt.length)} کار${books.length?' · '+fa(books.length)+' مطالعه':''}</div>`;
   if(books.length)h+=`<div class="study-strip">${books.map(p=>studyCard(p,d)).join('')}</div>`;
@@ -359,7 +365,7 @@ function weekView(){
   const today=TODAY(),ws=weekStart(today);
   let h='<div class="days">';
   for(let i=0;i<7;i++){
-    const d=addDays(ws,i),n=instOn(d).length;
+    const d=addDays(ws,i),n=spaceInstancesOn(d).length;
     h+=`<button class="day ${S.day===d?'on':''} ${d===today?'today':''}" data-act="day" data-v="${d}" data-id="0">
       <span class="dn">${WDS[i]}</span><span class="dc">${fa(n)}</span>
       <span class="dd ${n?'has':''}"></span></button>`;
@@ -371,7 +377,7 @@ function weekView(){
 
 function monthHasTasks(anchor){
   let d=addDays(anchor,-(jparts(anchor).d-1));const m=jparts(anchor).m;
-  for(let i=0;i<32&&jparts(d).m===m;i++){if(instOn(d).length)return true;d=addDays(d,1)}
+  for(let i=0;i<32&&jparts(d).m===m;i++){if(spaceInstancesOn(d).length)return true;d=addDays(d,1)}
   return false;
 }
 
@@ -382,7 +388,7 @@ function monthView(){
   while(days.length<32&&jparts(d).m===jb.m){days.push(d);d=addDays(d,1)}
   const last=days[days.length-1];
   const prev=addDays(first,-1),next=addDays(last,1);
-  const firstTask=S.tasks.reduce((m,t)=>(!m||t.date<m)?t.date:m,null);
+  const firstTask=tasksInSpace().reduce((m,t)=>(!m||t.date<m)?t.date:m,null);
   const floor=(firstTask&&firstTask<today)?firstTask:today;
   const showPrev=prev>=addDays(floor,-(jparts(floor).d-1));
   const showNext=monthHasTasks(next);
@@ -394,7 +400,7 @@ function monthView(){
   h+='<div class="mgrid">'+WDS.map(w=>`<div class="mwd">${w}</div>`).join('');
   for(let i=0;i<wdIndex(first);i++)h+='<div class="mcell blank"></div>';
   days.forEach(x=>{
-    const n=instOn(x).length;
+    const n=spaceInstancesOn(x).length;
     h+=`<button class="mcell ${S.day===x?'on':''} ${x===today?'today':''}" data-act="day" data-v="${x}" data-id="0">
       <span>${fa(jparts(x).d)}</span><span class="md ${n?'has':''}"></span></button>`;
   });
@@ -408,11 +414,11 @@ const dlabel=d=>{const t=TODAY();
   return d===t?'امروز':d===addDays(t,1)?'فردا':d===addDays(t,-1)?'دیروز':fa(WD[wdIndex(d)]+' '+jdate(d))};
 
 function catView(){
-  if(ACTIVE_TASK_DOMAINS[S.cat]){
-    const info=TASK_DOMAINS[S.cat],items=S.tasks.filter(t=>taskDomain(t)===S.cat).sort((a,b)=>Number(a.done)-Number(b.done)||a.date.localeCompare(b.date));
+  if(Object.hasOwn(TASK_DOMAINS,S.cat)){
+    const info=TASK_DOMAINS[S.cat],items=tasksInSpace().filter(t=>taskDomain(t)===S.cat).sort((a,b)=>Number(a.done)-Number(b.done)||a.date.localeCompare(b.date));
     return `<div class="mhead"><button class="mnav" data-act="cat" data-v="" data-id="0">›</button><b>${info.icon} ${info.label} — ${fa(items.length)} کار</b></div><div class="list">${items.map(taskCard).join('')||'<div class="empty">کاری در این دسته نیست.</div>'}</div>`;
   }
-  return '<div class="grid">'+Object.entries(ACTIVE_TASK_DOMAINS).map(([d,info])=>`<div class="cat" data-act="cat" data-v="${d}" data-id="0"><div class="tile">${info.icon}</div><div class="n">${info.label}</div><div class="c">${fa(S.tasks.filter(t=>taskDomain(t)===d&&!t.done).length)} کار</div></div>`).join('')+'</div>';
+  return '<div class="grid">'+Object.entries(TASK_DOMAINS).filter(([domain])=>taskSpace({meta:{domain}})===S.space).map(([d,info])=>`<div class="cat" data-act="cat" data-v="${d}" data-id="0"><div class="tile">${info.icon}</div><div class="n">${info.label}</div><div class="c">${fa(tasksInSpace().filter(t=>taskDomain(t)===d&&!t.done).length)} کار</div></div>`).join('')+'</div>';
 }
 
 /* ================= backup / restore ================= */
@@ -446,7 +452,7 @@ function doRestore(file){
       const d=JSON.parse(r.result);
       if(!d||!Array.isArray(d.tasks))throw 0;
       if(!confirm(`این فایل ${d.tasks.length} کار دارد. جایگزین کارهای فعلی شود؟`))return;
-      S.tasks=mergeSeries(d.tasks);removeWorkTasks();
+      S.tasks=mergeSeries(d.tasks);
       if(d.learn&&typeof d.learn==='object'){LEARN=d.learn;saveLearn()}
       if(Array.isArray(d.study)){STUDY=d.study;saveStudy()}
       if(d.decision&&typeof d.decision==='object')restoreDecision(d.decision);
@@ -461,7 +467,7 @@ function doRestore(file){
 }
 const impEl=document.getElementById('imp');
 if(impEl)impEl.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)doRestore(f);e.target.value=''};
-document.getElementById('graph-imp').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=JSON.parse(await f.text());const result=importTaskGraph(data);const removed=removeWorkTasks();S.tab=8;render();toast(fa(`${result.added-removed} کار اضافه شد؛ کارهای محل کار وارد فهرست فعال نشدند.`),4500)}catch(err){toast(err.message||'ورود فایل انجام نشد؛ داده‌های قبلی حفظ شدند.',4500)}};
+document.getElementById('graph-imp').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=JSON.parse(await f.text());const result=importTaskGraph(data);S.tab=8;render();toast(fa(`${result.added} کار اضافه شد.`),4500)}catch(err){toast(err.message||'ورود فایل انجام نشد؛ داده‌های قبلی حفظ شدند.',4500)}};
 
 /* ================= capture sheet ================= */
 const ov=document.getElementById('ov'),dr=document.getElementById('draft'),
@@ -476,7 +482,7 @@ function openSheet(id){
   if(t){dr.value=t.note||t.title;
     const auto=titleFrom(t.note||t.title);
     S.pv={c:t.c,s:t.s,p:t.p,rep:t.rep||null,every:t.every||null,until:t.until||null,date:t.date,time:t.time||null,
-          title:t.title,titleManual:t.title!==auto,touched:true,domain:ACTIVE_TASK_DOMAINS[taskDomain(t)]?taskDomain(t):'personal'};}
+          title:t.title,titleManual:t.title!==auto,touched:true,domain:taskDomain(t)};}
   else {dr.value='';S.pv=null}
   updatePv();document.getElementById('task-time').value=S.pv?.time||'';ov.classList.add('show');setTimeout(()=>dr.focus(),60);
 }
@@ -496,7 +502,7 @@ function updatePv(){
   pv.classList.add('show');
   const g=S.pv,today=TODAY();
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
-  if(!ACTIVE_TASK_DOMAINS[g.domain])g.domain=g.c===5?'home':'personal';
+  if(!Object.hasOwn(TASK_DOMAINS,g.domain))g.domain=S.space;
   document.getElementById('task-time').value=g.time||'';
   const parts=(g.time||':').split(':');document.getElementById('task-hour').value=parts[0]?fa(parts[0]):'';document.getElementById('task-minute').value=parts[1]?fa(parts[1]):'';
   document.getElementById('task-no-time').setAttribute('aria-pressed',String(!g.time));
@@ -570,7 +576,7 @@ function askFollowupTask(task){
 }
 pk.querySelector('.bd').onclick=()=>{if(typeof pk._onDismiss==='function')pk._onDismiss();pk._onDismiss=null;pk.classList.remove('show');pkbx.classList.remove('memory-box')};
 function picker(f){
-  if(f==='domain'){pkbx.innerHTML='<h4>این کار مربوط به کدام بخش است؟</h4>'+Object.entries(ACTIVE_TASK_DOMAINS).map(([d,x])=>`<button class="op" data-domain="${d}">${x.icon} ${x.label}</button>`).join('');pk.classList.add('show');pkbx.querySelectorAll('[data-domain]').forEach(b=>b.onclick=()=>{S.pv.domain=b.dataset.domain;S.pv.touched=true;pk.classList.remove('show');updatePv()});return}
+  if(f==='domain'){pkbx.innerHTML='<h4>این کار مربوط به کدام بخش است؟</h4>'+Object.entries(TASK_DOMAINS).map(([d,x])=>`<button class="op" data-domain="${d}">${x.icon} ${x.label}</button>`).join('');pk.classList.add('show');pkbx.querySelectorAll('[data-domain]').forEach(b=>b.onclick=()=>{S.pv.domain=b.dataset.domain;S.pv.touched=true;pk.classList.remove('show');updatePv()});return}
   pk._onDismiss=null;
   pkbx.classList.remove('memory-box');
   const g=S.pv,today=TODAY();
@@ -722,7 +728,7 @@ function userMemoryPicker(){
 sb.onclick=()=>{
   const txt=dr.value.trim();if(!txt)return;
   const g=S.pv||Object.assign({titleManual:false},classify(txt));
-  if(!ACTIVE_TASK_DOMAINS[g.domain])g.domain=g.c===5?'home':'personal';
+  if(!Object.hasOwn(TASK_DOMAINS,g.domain))g.domain=S.space;
   const ttl=(g.titleManual&&g.title)?g.title:titleFrom(txt);
   const today=TODAY();
   const dl=g.date===today?'امروز':g.date===addDays(today,1)?'فردا':fa(`${WD[wdIndex(g.date)]} ${jdate(g.date)}`);
@@ -730,8 +736,8 @@ sb.onclick=()=>{
   if(S.edit){
     const t=byId(S.edit);
     const changes={title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,meta:Object.assign({},t&&t.meta||{},g.meta||{},analyzed.meta||{})};
+    changes.meta.domain=g.domain;
     if(duplicateOf(changes,S.edit)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
-    if(g.domain)changes.meta.domain=g.domain;
     const oldDate=t&&t.date;if(t){Object.assign(t,changes);if(t.meta.graphSource&&oldDate!==t.date)t.meta.notBefore=t.date;}
     if(t&&oldDate!==t.date)recordTaskPostponedBehavior(t,oldDate,t.date,t.date>oldDate?'postponed':'rescheduled');
     const question=t?detectImportantAmbiguity(t):null,entry=t&&question?registerClarificationQuestion(t,question):null;
@@ -740,10 +746,11 @@ sb.onclick=()=>{
     return;
   }
   const newTask={id:Date.now(),title:ttl,note:txt,c:g.c,p:g.p,s:g.s,date:g.date,done:false,rep:g.rep||null,every:g.rep===REP_H?(g.every||8):null,until:g.rep?(g.until||null):null,time:g.time||null,rem:g.p===0,meta:Object.assign({},g.meta||{},analyzed.meta||{})};
+  newTask.meta.domain=g.domain;
   if(duplicateOf(newTask)){toast('این کار قبلاً با همین روز و ساعت ثبت شده است.',4000);return}
-  if(g.domain)newTask.meta.domain=g.domain;
   if(S.followupParent){const parent=byId(S.followupParent);if(parent)newTask.meta.prerequisiteTaskIds=[...new Set([...(newTask.meta.prerequisiteTaskIds||[]),parent.id])]}
   S.tasks.push(newTask);
+  S.space=taskSpace(newTask);
   const question=detectImportantAmbiguity(newTask),entry=question?registerClarificationQuestion(newTask,question):null;
   save();closeSheet();S.tab=0;S.day=g.date;S.pv=null;dr.value='';render();
   if(entry)setTimeout(()=>clarificationPicker(newTask,question,entry),80);
@@ -756,6 +763,19 @@ document.getElementById('sh-del').onclick=()=>{
 };
 
 document.querySelectorAll('nav button[data-tab]').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.tab;if(S.tab===7&&!S.taskMode)S.taskMode='today';if(S.tab===3){S.month=TODAY();S.day=TODAY()}if(S.tab===4)S.cat=null;render()});
+
+document.querySelectorAll('#task-spaces button').forEach(button=>{
+  button.onclick=()=>{
+    if(S.space===button.dataset.space)return;
+    S.space=button.dataset.space;
+    S.cat=null;
+    S.advisorPending=null;
+    S.advisorContext=null;
+    S.planPreview=false;
+    if(S.tab===5)S.tab=0;
+    render();
+  };
+});
 
 const sideMenu=document.getElementById('side-menu'),menuBtn=document.getElementById('menu-btn');
 function openMenu(){sideMenu.classList.add('show');sideMenu.setAttribute('aria-hidden','false');menuBtn.setAttribute('aria-expanded','true');document.body.classList.add('menu-open')}

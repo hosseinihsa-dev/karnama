@@ -75,9 +75,9 @@ function doseTimes(t,d){
   return out;
 }
 const slotOfTime=v=>{const hh=+v.split(':')[0];return hh<12?0:(hh<18?1:2)};
-function instOn(d){
+function instOn(d,tasks=S.tasks){
   const out=[];
-  S.tasks.forEach(t=>{
+  tasks.forEach(t=>{
     if(!occursOn(t,d))return;
     if(t.rep===REP_H){
       const times=doseTimes(t,d);
@@ -142,7 +142,7 @@ function dailyPlan(list,fromMin){
 
 /* ================= state ================= */
 const KEY='karnama.v1';
-let S={tab:0,sort:1,day:TODAY(),month:TODAY(),cat:null,taskMode:'today',advisorChat:[],sheet:false,pv:null,edit:null,planPreview:false,tasks:null};
+let S={tab:0,space:'home',sort:1,day:TODAY(),month:TODAY(),cat:null,taskMode:'today',advisorChat:[],sheet:false,pv:null,edit:null,planPreview:false,tasks:null};
 function load(){
   try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&Array.isArray(r.tasks))return r.tasks}catch(e){}
   const t=TODAY();
@@ -152,12 +152,18 @@ function load(){
     {id:3,title:'قبض برق را پرداخت کنم',c:7,p:0,s:1,date:addDays(t,-2),done:false},
   ];
 }
+function taskSpace(task){
+  const domain=task.meta?.domain;
+  return (domain==='work'||(!['home','personal'].includes(domain)&&task.c===4))?'work':'home';
+}
+const tasksInSpace=()=>S.tasks.filter(task=>taskSpace(task)===S.space);
+
 /* merge duplicates left over from the old repeat logic: one series per repeating task */
 function mergeSeries(tasks){
   const seen={},out=[];
   (tasks||[]).forEach(t=>{
     if(!t.rep){out.push(t);return}
-    const k=[t.title,t.rep,t.c,t.s,t.p,t.time||'',t.until||''].join('|');
+    const k=[taskSpace(t),t.title,t.rep,t.c,t.s,t.p,t.time||'',t.until||''].join('|');
     if(!seen[k]){
       const m=Object.assign({},t);
       m.doneOn=Object.assign({},t.doneOn||{});
@@ -387,6 +393,6 @@ function removeWithUndo(id){
 }
 const norm=s=>String(s||'').replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[‌\s]+/g,' ').trim().toLowerCase();
 function duplicateOf(task,exceptId=null){
-  return S.tasks.find(t=>t.id!==exceptId&&norm(t.title)===norm(task.title)&&t.date===task.date&&
+  return S.tasks.find(t=>t.id!==exceptId&&taskSpace(t)===taskSpace(task)&&norm(t.title)===norm(task.title)&&t.date===task.date&&
     (t.time||null)===(task.time||null)&&(t.rep||null)===(task.rep||null));
 }

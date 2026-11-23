@@ -339,3 +339,10 @@ body.advisor-mode main{padding-bottom:38px}
 #sheet>.hint{display:none}
 .time-stepper button:focus-visible,.time-stepper input:focus-visible,#prev .schedule-options .chip:focus-visible,#task-no-time:focus-visible{outline:2px solid #f4c84a;outline-offset:-3px}
 @media(max-width:374px){.schedule-grid{gap:10px}.time-steppers{gap:6px}.task-schedule{padding:12px}#prev .schedule-options .chip{padding:6px 8px;font-size:12px}}
+
+/* Task spaces */
+#task-spaces{display:flex;flex:1;gap:4px;min-width:0;padding:4px;border:1px solid #292b32;border-radius:16px;background:#16171b}
+#task-spaces button{flex:1;min-height:44px;padding:4px 6px;border:1px solid transparent;border-radius:11px;background:transparent;color:#c3c5cb;font:inherit;font-size:.85rem;line-height:1.4}
+#task-spaces button[aria-pressed="true"]{color:#f5d97d;background:#332a16;border-color:#8b702d}
+#task-spaces button:focus-visible{outline:2px solid #f5d97d;outline-offset:-3px}
+body.work-space nav button[data-tab="5"],body.work-space #menu-study{display:none}
