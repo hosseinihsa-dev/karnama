@@ -486,7 +486,7 @@ function openSheet(id){
   else {dr.value='';S.pv=null}
   updatePv();document.getElementById('task-time').value=S.pv?.time||'';ov.classList.add('show');setTimeout(()=>dr.focus(),60);
 }
-function closeSheet(){ov.classList.remove('show');dr.blur();if(S.awaitingFollowup){S.awaitingFollowup=false;S.followupParent=null;render()}}
+function closeSheet(){cancelTaskVoice();ov.classList.remove('show');dr.blur();if(S.awaitingFollowup){S.awaitingFollowup=false;S.followupParent=null;render()}}
 document.getElementById('fab').onclick=()=>openSheet();
 document.getElementById('scrim').onclick=closeSheet;
 
@@ -545,19 +545,80 @@ document.getElementById('task-no-time').onclick=()=>{S.pv.time=null;S.pv.touched
 
 /* ورود صوتی فقط متن را پر می‌کند؛ تحلیل و ذخیره دقیقاً همان مسیر ورود متنی است. */
 const mic=document.getElementById('voice-input');
+let cancelTaskVoice=()=>{};
 if(mic){
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SpeechRecognition){mic.classList.add('unsupported');mic.title='تشخیص گفتار در این مرورگر پشتیبانی نمی‌شود'}
   else{
-    let rec=null;
+    let recognition=null, retryTimer=null, listening=false, silentEnds=0;
+    const finish=()=>{
+      listening=false;
+      clearTimeout(retryTimer);
+      retryTimer=null;
+      recognition=null;
+      mic.classList.remove('listening');
+      mic.setAttribute('aria-label','ورود صوتی کار');
+    };
+    const start=()=>{
+      const session=new SpeechRecognition();
+      recognition=session;
+      session.lang='fa-IR';
+      session.continuous=true;
+      session.interimResults=false;
+      session.maxAlternatives=1;
+      session.onresult=event=>{
+        if(recognition!==session)return;
+        const phrases=[];
+        for(let i=event.resultIndex;i<event.results.length;i++){
+          if(event.results[i].isFinal)phrases.push(event.results[i][0].transcript.trim());
+        }
+        const text=phrases.filter(Boolean).join(' ');
+        if(!text)return;
+        silentEnds=0;
+        dr.value=[dr.value.trim(),text].filter(Boolean).join(' ');
+        updatePv();
+      };
+      session.onerror=event=>{
+        if(recognition!==session||event.error==='no-speech')return;
+        finish();
+        if(event.error!=='aborted')toast(event.error==='not-allowed'||event.error==='service-not-allowed'
+          ?'اجازه میکروفون داده نشد؛ همچنان می‌توانی تایپ کنی.'
+          :'ورود صوتی قطع شد؛ دوباره امتحان کن یا تایپ کن.',3500);
+      };
+      session.onend=()=>{
+        if(recognition!==session)return;
+        recognition=null;
+        if(listening&&silentEnds++<3){
+          retryTimer=setTimeout(start,300);
+        }else{
+          const timedOut=listening;
+          finish();
+          if(timedOut)toast('ورود صوتی پس از مکث طولانی پایان یافت. برای ادامه دوباره روی میکروفون بزن.',3500);
+        }
+      };
+      try{session.start()}catch{
+        finish();
+        toast('میکروفون شروع نشد؛ ورود متنی همچنان در دسترس است.',3500);
+      }
+    };
+    cancelTaskVoice=()=>{
+      const session=recognition;
+      finish();
+      if(session)try{session.abort()}catch{}
+    };
     mic.onclick=()=>{
-      if(rec){try{rec.stop()}catch(e){}return}
-      rec=new SpeechRecognition();rec.lang='fa-IR';rec.interimResults=false;rec.maxAlternatives=1;
-      mic.classList.add('listening');mic.setAttribute('aria-label','پایان ورود صوتی');
-      rec.onresult=e=>{const text=e.results&&e.results[0]&&e.results[0][0]&&e.results[0][0].transcript;if(text){dr.value=(dr.value.trim()?dr.value.trim()+' ': '')+text.trim();updatePv()}};
-      rec.onerror=e=>{if(e.error!=='aborted')toast(e.error==='not-allowed'?'اجازه میکروفون داده نشد؛ همچنان می‌توانی تایپ کنی.':'صدا تشخیص داده نشد؛ دوباره امتحان کن یا تایپ کن.',3500)};
-      rec.onend=()=>{rec=null;mic.classList.remove('listening');mic.setAttribute('aria-label','ورود صوتی کار')};
-      try{rec.start()}catch(e){rec=null;mic.classList.remove('listening');toast('میکروفون شروع نشد؛ ورود متنی همچنان در دسترس است.',3500)}
+      if(listening){
+        listening=false;
+        if(recognition){try{recognition.stop()}catch{finish()}}
+        else finish();
+        return;
+      }
+      if(recognition)return;
+      listening=true;
+      silentEnds=0;
+      mic.classList.add('listening');
+      mic.setAttribute('aria-label','پایان ورود صوتی');
+      start();
     };
   }
 }
