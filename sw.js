@@ -1,5 +1,5 @@
-const C = 'karnama-v82';
-const FILES = ['./', './index.html', './core.js?v=82', './memory.js?v=82', './behavior.js?v=82', './study.js?v=82', './graph.js?v=82', './decision.js?v=82', './clarify.js?v=82', './views.js?v=82', './style.css?v=82', './manifest.json?v=82', './icon-192.png?v=82', './icon-512.png?v=82', './icon-maskable.png?v=82', './logo-karnama.png?v=82'];
+const C = 'karnama-v83';
+const FILES = ['./', './index.html', './core.js?v=83', './memory.js?v=83', './behavior.js?v=83', './study.js?v=83', './graph.js?v=83', './decision.js?v=83', './clarify.js?v=83', './views.js?v=83', './style.css?v=83', './manifest.json?v=83', './icon-192.png?v=83', './icon-512.png?v=83', './icon-maskable.png?v=83', './logo-karnama.png?v=83'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => Promise.all(FILES.map(f => c.add(f).catch(() => {})))).then(() => self.skipWaiting()));
 });
@@ -21,24 +21,30 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', event => event.waitUntil(showReminder(event)));
 
 async function showReminder(event) {
-  let due;
-  try { due = event.data?.json().due; } catch { return; }
+  let due, stage;
+  try { ({due, minutes:stage} = event.data?.json() || {}); } catch { return; }
   if (!Number.isSafeInteger(due) || due <= Date.now()) return;
-  const minutes = Math.ceil((due - Date.now()) / 60_000);
+  const minutes = stage === 5 || stage === 15 ? stage : Math.ceil((due - Date.now()) / 60_000);
   const label = new Intl.NumberFormat('fa-IR').format(minutes);
-  const receipt = {due, at:Date.now(), displayed:false};
+  const receipt = {due, minutes:stage, at:Date.now(), displayed:false};
+  const cache = await caches.open(C);
+  let titles;
   try {
-    await self.registration.showNotification('کارنما', {
-      body: `تا کار بعدی ${label} دقیقه مانده است.`,
+    const cached = await cache.match(new URL('./__push-titles', self.registration.scope));
+    titles = cached && (await cached.json())[due];
+  } catch {}
+  try {
+    const names = titles?.length ? titles : ['کارنما'];
+    await Promise.all(names.map((title, index) => self.registration.showNotification(title, {
+      body: `${label} دقیقه تا زمان انجام کار`,
       icon: new URL('./icon-192.png', self.registration.scope).href,
-      tag: 'karnama-upcoming-' + due,
+      tag: `karnama-upcoming-${due}-${stage || 'legacy'}-${index}`,
       data: {page: new URL('./index.html', self.registration.scope).href},
-    });
+    })));
     receipt.displayed = true;
   } catch (error) {
     receipt.error = error.name;
   }
-  const cache = await caches.open(C);
   await cache.put(new URL('./__push-receipt', self.registration.scope), Response.json(receipt));
 }
 self.addEventListener('notificationclick', event => {

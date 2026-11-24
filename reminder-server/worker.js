@@ -2,8 +2,25 @@ import { DurableObject } from 'cloudflare:workers';
 import webPush from 'web-push';
 
 const leadMs = 15 * 60_000;
+const shortLeadMs = 5 * 60_000;
 const dayMs = 86_400_000;
 const json = (data, status = 200) => Response.json(data, {status});
+
+function nextReminder(schedule, now = Date.now()) {
+  let next;
+  for (const due of schedule.pending) {
+    if (due <= now) continue;
+    const minutes = !schedule.sent.includes(due) && due - now > shortLeadMs ? 15 : 5;
+    const at = due - (minutes === 15 ? leadMs : shortLeadMs);
+    if (!next || at < next.at) next = {due, minutes, at};
+  }
+  return next;
+}
+
+function scheduleStatus(schedule, diagnostic) {
+  const next = schedule && nextReminder(schedule);
+  return {next:next?.due ?? null, nextAt:next?.at ?? null, pending:schedule?.pending.length ?? 0, diagnostic};
+}
 
 function validSubscription(subscription) {
   if (typeof subscription?.endpoint !== 'string' || subscription.endpoint.length > 2048) return false;
@@ -48,7 +65,7 @@ export class ReminderDevice extends DurableObject {
     if (request.method === 'GET') {
       const schedule = await storage.get('schedule');
       const diagnostic = await storage.get('diagnostic');
-      return json({next: schedule?.pending[0] ?? null, pending: schedule?.pending.length ?? 0, diagnostic});
+      return json(scheduleStatus(schedule, diagnostic));
     }
     if (request.method === 'DELETE') {
       await storage.deleteAlarm();
@@ -81,21 +98,24 @@ export class ReminderDevice extends DurableObject {
     const now = Date.now();
     const previous = await storage.get('schedule');
     const sent = previous?.sent.filter(due => due > now) || [];
-    const pending = [...new Set(times)].filter(due => due > now && due < now + 31 * dayMs && !sent.includes(due))
+    const sentFive = previous?.sentFive?.filter(due => due > now) || [];
+    const pending = [...new Set(times)].filter(due => due > now && due < now + 31 * dayMs && !sentFive.includes(due))
       .sort((a,b) => a-b);
-    await this.store({subscription, pending, sent});
-    return json({next:pending[0] ?? null, pending:pending.length, diagnostic:await storage.get('diagnostic')});
+    const schedule = {subscription, pending, sent, sentFive};
+    await this.store(schedule);
+    return json(scheduleStatus(schedule, await storage.get('diagnostic')));
   }
 
   async store(schedule, retryAt = 0) {
     const storage = this.ctx.storage;
-    if (!schedule.pending.length && !schedule.sent.length) {
+    const expiry = [...schedule.sent, ...(schedule.sentFive || [])];
+    if (!schedule.pending.length && !expiry.length) {
       await storage.deleteAlarm();
       await storage.delete('schedule');
       return;
     }
     await storage.put('schedule', schedule);
-    const next = schedule.pending.length ? schedule.pending[0] - leadMs : Math.max(...schedule.sent);
+    const next = nextReminder(schedule)?.at ?? Math.max(...expiry);
     await storage.setAlarm(Math.max(Date.now() + 1000, retryAt, next));
   }
 
@@ -106,14 +126,16 @@ export class ReminderDevice extends DurableObject {
     const now = Date.now();
     schedule.pending = schedule.pending.filter(due => due > now);
     schedule.sent = schedule.sent.filter(due => due > now);
-    const due = schedule.pending[0];
-    if (due === undefined || due - now > leadMs) return this.store(schedule);
+    schedule.sentFive = (schedule.sentFive || []).filter(due => due > now);
+    const next = nextReminder(schedule, now);
+    if (!next || next.at > now) return this.store(schedule);
+    const {due, minutes} = next;
     const {VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY} = this.env;
     let response;
     try {
-      const details = webPush.generateRequestDetails(schedule.subscription, JSON.stringify({due}), {
+      const details = webPush.generateRequestDetails(schedule.subscription, JSON.stringify({due, minutes}), {
         vapidDetails:{subject:VAPID_SUBJECT, publicKey:VAPID_PUBLIC_KEY, privateKey:VAPID_PRIVATE_KEY},
-        TTL:Math.ceil((due-now)/1000), urgency:'high',
+        TTL:Math.ceil((due-now-(minutes === 15 ? shortLeadMs : 0))/1000), urgency:'high',
       });
       const headers = new Headers(details.headers);
       headers.delete('Content-Length');
@@ -122,18 +144,21 @@ export class ReminderDevice extends DurableObject {
         signal:AbortSignal.timeout(5000),
       });
       console.log('push response', response.status);
-      await storage.put('diagnostic', {at:now, due, status:response.status});
+      await storage.put('diagnostic', {at:now, due, minutes, status:response.status});
     } catch (error) {
       console.error('push request failed', error.name, error.code || '',
         String(error.message || '').replace(/https?:\/\/\S+/g, '[url]'));
-      await storage.put('diagnostic', {at:now, due, status:null});
+      await storage.put('diagnostic', {at:now, due, minutes, status:null});
     }
     const latest = await storage.get('schedule');
     if (!latest || latest.subscription.endpoint !== schedule.subscription.endpoint) return;
     if (response && [404,410].includes(response.status)) return this.store({pending:[], sent:[]});
     if (response?.ok) {
-      latest.pending = latest.pending.filter(time => time !== due);
-      latest.sent.push(due);
+      if (minutes === 15) latest.sent.push(due);
+      else {
+        latest.pending = latest.pending.filter(time => time !== due);
+        latest.sentFive = [...(latest.sentFive || []), due];
+      }
       return this.store(latest);
     }
     return this.store(latest, Date.now() + 60_000);

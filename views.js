@@ -947,8 +947,8 @@ const reminderLeadMs = 15 * 60 * 1000;
 const reminderWindowDays = 30;
 let reminderSync = Promise.resolve();
 
-function reminderTimes(now = Date.now()) {
-  const dates = new Set();
+function reminderTasks(now = Date.now()) {
+  const dates = new Map();
   for (let offset = 0; offset < reminderWindowDays; offset++) {
     const date = addDays(TODAY(), offset);
     for (const task of instOn(date)) {
@@ -956,10 +956,12 @@ function reminderTimes(now = Date.now()) {
       if (!time || +time[1] > 23 || task.done || graphReadiness(task, date).blocked) continue;
       const due = fromIso(task.date);
       due.setHours(+time[1], +time[2], 0, 0);
-      if (+due > now) dates.add(+due);
+      if (+due <= now) continue;
+      if (!dates.has(+due)) dates.set(+due, []);
+      dates.get(+due).push(String(task.title || 'کار زمان‌دار'));
     }
   }
-  return [...dates].sort((a, b) => a - b).slice(0, 256);
+  return new Map([...dates].sort(([a], [b]) => a - b).slice(0, 256));
 }
 
 async function reminderRequest(path, options) {
@@ -977,18 +979,21 @@ function syncAndroidReminders() {
     const subscription = await registration.pushManager.getSubscription();
     if (!subscription) throw new Error('Push subscription unavailable');
     const testDue = Number(localStorage.getItem(reminderTestKey));
-    const times = reminderTimes();
+    const tasks = reminderTasks();
+    const times = [...tasks.keys()];
     if (testDue > Date.now() && !times.includes(testDue)) {
       times.push(testDue);
       times.sort((a,b) => a-b);
       times.length = Math.min(times.length, 256);
     }
+    const cache = await caches.open('karnama-v83');
+    await cache.put(new URL('./__push-titles', registration.scope), Response.json(Object.fromEntries(tasks)));
     const result = await reminderRequest('/schedule', {
       method: 'PUT',
       headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + token},
       body: JSON.stringify({subscription: subscription.toJSON(), times}),
     });
-    const next = result.next && new Date(Math.max(Date.now(), result.next - reminderLeadMs))
+    const next = result.next && new Date(Math.max(Date.now(), result.nextAt ?? result.next - reminderLeadMs))
       .toLocaleString('fa-IR', {hour:'2-digit', minute:'2-digit', month:'short', day:'numeric'});
     const diagnostic = result.diagnostic;
     let message = next ? `نوبت ارسال بعدی ${next} است.` : 'هیچ کار ساعت‌داری برای ارسال در صف نیست.';
@@ -1003,7 +1008,7 @@ function syncAndroidReminders() {
         try {
           const cached = await caches.match(new URL('./__push-receipt', registration.scope));
           const receipt = cached && await cached.json();
-          if (receipt?.due === diagnostic.due) {
+          if (receipt?.due === diagnostic.due && receipt?.minutes === diagnostic.minutes) {
             message += receipt.displayed ? ' Chrome اعلان را به اندروید سپرد.'
               : ` Chrome پیام را گرفت ولی نمایش اعلان خطا داد (${receipt.error}).`;
           } else {

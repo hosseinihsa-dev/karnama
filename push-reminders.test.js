@@ -20,15 +20,19 @@ test('Android schedule contains future task times without task text', () => {
   });
   const source = fs.readFileSync('views.js','utf8').split('/* Android background reminders */')[1];
   vm.runInContext(source.replace(/\nrender\(\);\s*$/, ''), context);
-  assert.deepEqual(Array.from(context.reminderTimes(+now)), [+now + 15 * 60_000]);
+  assert.deepEqual(Array.from(context.reminderTasks(+now).keys()), [+now + 15 * 60_000]);
 });
 
 test('the service worker can display the reminder without an open page', async () => {
   const handlers = {};
   let notification, completion, receipt;
+  const due = Date.now()+899_000;
   const context = vm.createContext({
     URL, Intl, Date, Response,
-    caches:{open:async()=>({put:async (_, response)=>{ receipt = await response.json(); }})},
+    caches:{open:async()=>({
+      match:async()=>Response.json({[due]:['جلسه انبارداری']}),
+      put:async (_, response)=>{ receipt = await response.json(); },
+    })},
     self:{
       addEventListener:(name,fn)=>{ handlers[name]=fn; },
       registration:{
@@ -38,9 +42,9 @@ test('the service worker can display the reminder without an open page', async (
     },
   });
   vm.runInContext(fs.readFileSync('sw.js','utf8'), context);
-  handlers.push({data:{json:()=>({due:Date.now()+899_000})},waitUntil:work=>{ completion=work; }});
+  handlers.push({data:{json:()=>({due,minutes:15})},waitUntil:work=>{ completion=work; }});
   await completion;
-  assert.equal(notification[0], 'کارنما');
+  assert.equal(notification[0], 'جلسه انبارداری');
   assert.match(notification[1].body, /۱۵ دقیقه/);
   assert.equal(notification[1].data.page, 'https://example.com/karnama/index.html');
   assert.equal(receipt.displayed, true);
