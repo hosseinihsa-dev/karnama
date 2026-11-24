@@ -361,3 +361,8 @@ body.work-space nav button[data-tab="5"],body.work-space #menu-study{display:non
 .advisor-next-tasks>summary:focus-visible{outline:2px solid #b9e633;outline-offset:2px}
 .advisor-next-tasks .list{margin-top:8px}
 .advisor-next-tasks h3{margin:10px 2px 2px;font-size:.85rem;color:#b7bab7}
+.advisor-late-tasks{width:100%;max-width:460px;margin-top:14px;color:#ffb4bb}
+.advisor-late-tasks h3{font-size:.85rem;margin:0 2px 6px}
+.advisor-late-tasks .task{background:#2a191d;border-color:#704047;padding-block:8px}
+.advisor-late-tasks .ttl,.advisor-late-tasks .rank{color:#ffb4bb}
+.advisor-late-tasks .note{display:none}

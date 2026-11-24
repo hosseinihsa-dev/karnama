@@ -14,9 +14,12 @@ function advisorTaskPool(date=TODAY()){
   (S.space==='home'?STUDY||[]:[]).filter(studyDue).forEach(p=>tasks.push({id:-Math.abs(+p.id||1),title:`مطالعه ${p.title}`,note:`برنامه مطالعه ${p.title}`,c:1,p:1,s:slot,date,done:false,rep:null,time:null,meta:{advisorStudy:true,studyId:p.id}}));
   return tasks;
 }
-function chooseAdvisorTask(date=TODAY()){
-  const pool=advisorTaskPool(date),regular=chooseNextTask(pool.filter(t=>!t.meta?.advisorStudy),date);if(regular)return regular;
-  const studyOnly=pool.filter(t=>t.meta&&t.meta.advisorStudy);return chooseNextTask(studyOnly,date);
+function chooseAdvisorTask(date=TODAY(),now=Date.now()){
+  const include=task=>!advisorTimePassed(task,now);
+  const pool=advisorTaskPool(date);
+  const regular=chooseNextTask(pool.filter(t=>!t.meta?.advisorStudy),date,undefined,include);
+  if(regular)return regular;
+  return chooseNextTask(pool.filter(t=>t.meta?.advisorStudy),date,undefined,include);
 }
 
 /* ================= render ================= */
@@ -111,6 +114,8 @@ function advisorCountdownText(at,deadline,now=Date.now()){
 }
 
 function updateAdvisorCountdown(){
+  const home=document.querySelector('[data-advisor-transition]');
+  if(home&&Date.now()>Number(home.dataset.advisorTransition)){render();return}
   const counter=document.getElementById('advisor-countdown');
   if(!counter)return;
   if(counter.dataset.upcoming==='true'&&Date.now()>=Number(counter.dataset.at)){render();return}
@@ -144,7 +149,16 @@ function advisorWaitingCard(today,nowMin,upcoming=advisorUpcomingTask(today,nowM
   return `<div class="advisor-proposal empty"><h2>فعلاً کاری آمادهٔ انجام نیست</h2><p>${detail}</p>${hasTasks?`<div>${allTasks}</div>`:''}</div>`;
 }
 
-function advisorFollowingTasks(today, list, overdue, featured){
+function advisorScheduledAt(task){
+  return advisorCountdownTarget({date:task.date,time:task.time})?.at ?? null;
+}
+
+function advisorTimePassed(task,now){
+  const at=advisorScheduledAt(task);
+  return at!==null&&at<now;
+}
+
+function advisorFollowingTasks(today, list, overdue, featured, passed=new Set()){
   const next=[...overdue,...list.filter(task=>!task.done)];
   const todayIds=new Set(next.map(task=>task.id));
   const tomorrow=addDays(today,1);
@@ -161,12 +175,12 @@ function advisorFollowingTasks(today, list, overdue, featured){
     }
   }
   const featuredKey=featured&&decisionKey(featured);
-  return next.filter(task=>decisionKey(task)!==featuredKey)
+  return next.filter(task=>decisionKey(task)!==featuredKey&&!passed.has(decisionKey(task)))
     .sort((a,b)=>a.date.localeCompare(b.date)||bySlot(a,b));
 }
 
-function advisorFollowingList(today,list,overdue,featured){
-  const tasks=advisorFollowingTasks(today,list,overdue,featured);
+function advisorFollowingList(today,list,overdue,featured,passed){
+  const tasks=advisorFollowingTasks(today,list,overdue,featured,passed);
   let open=false;
   try{open=localStorage.getItem('karnama.advisor-next-tasks')==='true'}catch{}
   let previousDate;
@@ -184,13 +198,21 @@ function advisorFollowingList(today,list,overdue,featured){
 }
 
 function advisorHome(overdue,list,doneN,today){
-  const x=chooseAdvisorTask(today);
+  const now=Date.now();
+  const x=chooseAdvisorTask(today,now);
+  const active=[...overdue,...list.filter(task=>!task.done)];
+  const late=active.filter(task=>advisorTimePassed(task,now))
+    .sort((a,b)=>advisorScheduledAt(b)-advisorScheduledAt(a));
+  const passed=new Set(late.map(decisionKey));
+  const lateList=late.length?`<section class="advisor-late-tasks"><h3>ساعت انجام گذشته</h3><div class="list">${late.map(taskCard).join('')}</div></section>`:'';
+  const nextTransition=Math.min(...active.map(advisorScheduledAt).filter(at=>at!==null&&at>=now));
+  const transition=Number.isFinite(nextTransition)?` data-advisor-transition="${nextTransition}"`:'';
   if(x)recordSuggestedBehavior(x.task,x);
   const target=x&&advisorCountdownTarget(x.task);
   const countdown=advisorCountdownMarkup(target);
   const upcoming=x?null:advisorUpcomingTask(today);
   const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2>${domainChip(x.task)} ${x.task.time?`<time class="chip c-nu" datetime="${esc(x.task.time)}">ساعت <bdi>${esc(fa(x.task.time))}</bdi></time>`:''}${countdown}<div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionDone" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">✓ انجام شد</button></div></div>`:advisorWaitingCard(today,undefined,upcoming);
-  return `<section class="coach-home"><div class="coach-orb"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 7c6 0 10 3 13 8 3-5 7-8 13-8v7c-6 0-9 4-9 10v10h-8V24c0-6-3-10-9-10z"/></svg></div><h2 class="coach-question">قدم بعدی امروز</h2>${proposal}${advisorFollowingList(today,list,overdue,x?.task||upcoming)}<button class="home-add-task" data-act="addTask" data-id="0"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>افزودن کار</span></button></section>`;
+  return `<section class="coach-home"${transition}><div class="coach-orb"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 7c6 0 10 3 13 8 3-5 7-8 13-8v7c-6 0-9 4-9 10v10h-8V24c0-6-3-10-9-10z"/></svg></div><h2 class="coach-question">قدم بعدی امروز</h2>${lateList}${proposal}${advisorFollowingList(today,list,overdue,x?.task||upcoming,passed)}<button class="home-add-task" data-act="addTask" data-id="0"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>افزودن کار</span></button></section>`;
 }
 
 function tasksView(overdue,list,doneN,today){
@@ -1029,7 +1051,7 @@ function syncAndroidReminders() {
       times.sort((a,b) => a-b);
       times.length = Math.min(times.length, 256);
     }
-    const cache = await caches.open('karnama-v84');
+    const cache = await caches.open('karnama-v85');
     await cache.put(new URL('./__push-titles', registration.scope), Response.json(Object.fromEntries(tasks)));
     const result = await reminderRequest('/schedule', {
       method: 'PUT',

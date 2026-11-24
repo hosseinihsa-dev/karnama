@@ -45,7 +45,11 @@ assert.equal(check("advisorUpcomingTask(today,945).id"),50);
 assert.match(check("advisorWaitingCard(today,945)"),/جلسهٔ انبارداری.*data-upcoming="true".*دیدن کارهای ثبت‌شده/);
 assert.equal(check("advisorUpcomingTask(today,960).id"),52);
 assert.equal(check("chooseNextTask(tasksInSpace(),today,960).task.id"),50);
+assert.equal(check("advisorTimePassed(meeting,+new Date(2026,10,23,16,0,1))"),true);
+assert.equal(check("advisorTimePassed(meeting,+new Date(2026,10,23,15,59,59))"),false);
+assert.equal(check("chooseNextTask(tasksInSpace(),today,961,task=>!advisorTimePassed(task,+new Date(2026,10,23,16,1)))"),null);
 assert.equal(check(`
   S.tasks.push({...meeting,id:53,date:addDays(today,2)}, {...meeting,id:54,done:true});
   advisorFollowingTasks(today,instOn(today,tasksInSpace()),[],meeting).map(task=>task.id).join(',')
 `), '52,53');
+assert.equal(check("advisorFollowingTasks(today,instOn(today,tasksInSpace()),[],null,new Set([decisionKey(meeting)])).map(task=>task.id).join(',')"),'52,53');

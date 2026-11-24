@@ -140,17 +140,18 @@ function evaluateDecisionTask(t,date=TODAY(),nowMin=decisionNowMinutes()){
   return {task:t,score,reason,duration,trace};
 }
 
-function partitionDecisionCandidates(tasks,date=TODAY(),nowMin=decisionNowMinutes()){
+function partitionDecisionCandidates(tasks,date=TODAY(),nowMin=decisionNowMinutes(),include=()=>true){
   const groups={available:[],unknown:[],blocked:[]};
   decisionCandidates(tasks,date,nowMin).forEach(task=>{
+    if(!include(task))return;
     const feasibility=assessNowFeasibility(task,{date,nowMin});
     groups[feasibility.status].push({task,feasibility});
   });
   return groups;
 }
 
-function chooseNextTask(tasks,date=TODAY(),nowMin=decisionNowMinutes()){
-  const groups=partitionDecisionCandidates(tasks,date,nowMin);
+function chooseNextTask(tasks,date=TODAY(),nowMin=decisionNowMinutes(),include){
+  const groups=partitionDecisionCandidates(tasks,date,nowMin,include);
   const pool=groups.available.length?groups.available:groups.unknown;
   const ranked=pool.map(x=>Object.assign(evaluateDecisionTask(x.task,date,nowMin),{feasibility:x.feasibility}))
     .sort((a,b)=>b.trace.urgency.level-a.trace.urgency.level||b.trace.impact.level-a.trace.impact.level||Number(!!decisionMeta(b.task).explicitPriority)-Number(!!decisionMeta(a.task).explicitPriority)||b.trace.urgency.weight-a.trace.urgency.weight||b.trace.impact.weight-a.trace.impact.weight||b.trace.manual.level-a.trace.manual.level||b.trace.personal.score-a.trace.personal.score||((a.duration||Infinity)-(b.duration||Infinity))||(a.task.id-b.task.id));
