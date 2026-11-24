@@ -31,7 +31,7 @@ export default {
     else if (path === '/key' && request.method === 'GET') {
       result = env.VAPID_PUBLIC_KEY ? json({publicKey:env.VAPID_PUBLIC_KEY}) : json({}, 503);
     } else if (path !== '/schedule') result = json({}, 404);
-    else if (!['PUT','DELETE'].includes(request.method)) result = json({}, 405);
+    else if (!['GET','PUT','DELETE'].includes(request.method)) result = json({}, 405);
     else {
       const credential = /^Bearer ([a-f0-9-]{72})$/.exec(request.headers.get('Authorization') || '');
       if (!credential) result = json({}, 401);
@@ -45,9 +45,15 @@ export default {
 export class ReminderDevice extends DurableObject {
   async fetch(request) {
     const storage = this.ctx.storage;
+    if (request.method === 'GET') {
+      const schedule = await storage.get('schedule');
+      const diagnostic = await storage.get('diagnostic');
+      return json({next: schedule?.pending[0] ?? null, pending: schedule?.pending.length ?? 0, diagnostic});
+    }
     if (request.method === 'DELETE') {
       await storage.deleteAlarm();
       await storage.delete('schedule');
+      await storage.delete('diagnostic');
       return json({});
     }
     if (!request.body) return json({}, 400);
@@ -78,7 +84,7 @@ export class ReminderDevice extends DurableObject {
     const pending = [...new Set(times)].filter(due => due > now && due < now + 31 * dayMs && !sent.includes(due))
       .sort((a,b) => a-b);
     await this.store({subscription, pending, sent});
-    return json({});
+    return json({next:pending[0] ?? null, pending:pending.length, diagnostic:await storage.get('diagnostic')});
   }
 
   async store(schedule, retryAt = 0) {
@@ -116,9 +122,11 @@ export class ReminderDevice extends DurableObject {
         signal:AbortSignal.timeout(5000),
       });
       console.log('push response', response.status);
+      await storage.put('diagnostic', {at:now, due, status:response.status});
     } catch (error) {
       console.error('push request failed', error.name, error.code || '',
         String(error.message || '').replace(/https?:\/\/\S+/g, '[url]'));
+      await storage.put('diagnostic', {at:now, due, status:null});
     }
     const latest = await storage.get('schedule');
     if (!latest || latest.subscription.endpoint !== schedule.subscription.endpoint) return;

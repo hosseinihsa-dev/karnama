@@ -5,7 +5,8 @@ const test = require('node:test');
 
 test('a Cloudflare alarm sends once and advances to the next reminder', async () => {
   let now = 1_800_000_000_000;
-  let schedule, alarmAt, delivered = 0;
+  let alarmAt, delivered = 0;
+  const records = new Map();
   const source = fs.readFileSync(require('node:path').join(__dirname, 'worker.js'), 'utf8')
     .replace(/^import .*;$/gm, '').replace('export default', 'globalThis.router =')
     .replace('export class ReminderDevice', 'globalThis.ReminderDevice = class');
@@ -22,9 +23,9 @@ test('a Cloudflare alarm sends once and advances to the next reminder', async ()
   });
   vm.runInContext(source, context);
   const storage = {
-    get: async () => structuredClone(schedule),
-    put: async (_, value) => { schedule = structuredClone(value); },
-    delete: async () => { schedule = undefined; },
+    get: async key => structuredClone(records.get(key)),
+    put: async (key, value) => { records.set(key, structuredClone(value)); },
+    delete: async key => { records.delete(key); },
     setAlarm: async at => { alarmAt = at; },
     deleteAlarm: async () => { alarmAt = undefined; },
   };
@@ -39,6 +40,8 @@ test('a Cloudflare alarm sends once and advances to the next reminder', async ()
   now = alarmAt;
   await device.alarm();
   assert.equal(delivered, 1);
+  const status = await device.fetch(new Request('https://example.com/schedule'));
+  assert.equal((await status.json()).diagnostic.status, 201);
   await put();
   assert.equal(alarmAt, now + 20 * 60_000);
   await device.alarm();

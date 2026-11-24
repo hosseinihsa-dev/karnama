@@ -939,8 +939,10 @@ const REMINDER_SERVICE_URL = 'https://karnama-reminders.hosseini-hsa.workers.dev
 const androidReminders = /Android/i.test(navigator.userAgent) && 'PushManager' in window
   && 'Notification' in window && 'serviceWorker' in navigator;
 const reminderButton = document.getElementById('push-reminders');
+const reminderTest = document.getElementById('push-reminder-test');
 const reminderStatus = document.getElementById('push-reminder-status');
 const reminderKey = 'karnama.push-device';
+const reminderTestKey = 'karnama.push-test-due';
 const reminderLeadMs = 15 * 60 * 1000;
 const reminderWindowDays = 30;
 let reminderSync = Promise.resolve();
@@ -974,13 +976,33 @@ function syncAndroidReminders() {
     const registration = await navigator.serviceWorker.ready;
     const subscription = await registration.pushManager.getSubscription();
     if (!subscription) throw new Error('Push subscription unavailable');
-    await reminderRequest('/schedule', {
+    const testDue = Number(localStorage.getItem(reminderTestKey));
+    const times = reminderTimes();
+    if (testDue > Date.now() && !times.includes(testDue)) {
+      times.push(testDue);
+      times.sort((a,b) => a-b);
+      times.length = Math.min(times.length, 256);
+    }
+    const result = await reminderRequest('/schedule', {
       method: 'PUT',
       headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + token},
-      body: JSON.stringify({subscription: subscription.toJSON(), times: reminderTimes()}),
+      body: JSON.stringify({subscription: subscription.toJSON(), times}),
     });
-    reminderStatus.textContent = 'یادآورهای اندروید فعال‌اند.';
+    const next = result.next && new Date(Math.max(Date.now(), result.next - reminderLeadMs))
+      .toLocaleString('fa-IR', {hour:'2-digit', minute:'2-digit', month:'short', day:'numeric'});
+    const diagnostic = result.diagnostic;
+    let message = next ? `نوبت ارسال بعدی ${next} است.` : 'هیچ کار ساعت‌داری برای ارسال در صف نیست.';
+    if (diagnostic) {
+      const status = diagnostic.status;
+      const prefix = diagnostic.due === testDue ? 'آزمون' : 'آخرین ارسال';
+      const outcome = status >= 200 && status < 300 ? 'گوگل پیام را پذیرفت.'
+        : status === 404 || status === 410 ? 'اشتراک منقضی شده؛ یادآور را خاموش و دوباره فعال کن.'
+        : status ? `پاسخ گوگل ${status} بود.` : 'ارتباط با گوگل برقرار نشد.';
+      message += ` ${prefix} ـ ${outcome}`;
+    }
+    reminderStatus.textContent = message;
     reminderButton.textContent = 'خاموش کردن یادآور';
+    reminderTest.hidden = false;
   }).catch(() => {
     reminderStatus.textContent = 'همگام‌سازی یادآورها انجام نشد. اتصال را بررسی کن.';
     throw new Error('Reminder sync failed');
@@ -991,6 +1013,17 @@ function syncAndroidReminders() {
 if (androidReminders && REMINDER_SERVICE_URL) {
   reminderButton.hidden = false;
   if (localStorage.getItem(reminderKey)) reminderButton.textContent = 'خاموش کردن یادآور';
+  reminderTest.onclick = async () => {
+    reminderTest.disabled = true;
+    try {
+      localStorage.setItem(reminderTestKey, String(Date.now() + reminderLeadMs + 60_000));
+      await syncAndroidReminders();
+    } catch {
+      localStorage.removeItem(reminderTestKey);
+    } finally {
+      reminderTest.disabled = false;
+    }
+  };
   reminderButton.onclick = async () => {
     reminderButton.disabled = true;
     try {
@@ -1005,6 +1038,8 @@ if (androidReminders && REMINDER_SERVICE_URL) {
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) await subscription.unsubscribe();
         localStorage.removeItem(reminderKey);
+        localStorage.removeItem(reminderTestKey);
+        reminderTest.hidden = true;
         reminderButton.textContent = 'فعال کردن یادآور اندروید';
         reminderStatus.textContent = 'یادآورها خاموش شدند.';
         await reminderRequest('/schedule', {method:'DELETE', headers:{Authorization:'Bearer ' + token}});
