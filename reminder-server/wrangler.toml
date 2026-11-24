@@ -1,0 +1,15 @@
+name = "karnama-reminders"
+main = "worker.js"
+compatibility_date = "2026-11-24"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+APP_ORIGIN = "https://hosseinihsa-dev.github.io"
+
+[[durable_objects.bindings]]
+name = "DEVICES"
+class_name = "ReminderDevice"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ReminderDevice"]

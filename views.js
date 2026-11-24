@@ -21,6 +21,7 @@ function chooseAdvisorTask(date=TODAY()){
 
 /* ================= render ================= */
 function render(){
+  if(typeof syncAndroidReminders==='function')syncAndroidReminders().catch(()=>{});
   if(S.awaitingFollowup)return;
   const today=TODAY();
   captureMissedDeadlineBehaviors(S.tasks,today);
@@ -929,5 +930,100 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sideMenu.classList.
 
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
 
-render();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+/* Android background reminders */
+// Set to the HTTPS URL of the deployed reminder service, without a trailing slash.
+const REMINDER_SERVICE_URL = 'https://karnama-reminders.hosseini-hsa.workers.dev';
+
+const androidReminders = /Android/i.test(navigator.userAgent) && 'PushManager' in window
+  && 'Notification' in window && 'serviceWorker' in navigator;
+const reminderButton = document.getElementById('push-reminders');
+const reminderStatus = document.getElementById('push-reminder-status');
+const reminderKey = 'karnama.push-device';
+const reminderLeadMs = 15 * 60 * 1000;
+const reminderWindowDays = 30;
+let reminderSync = Promise.resolve();
+
+function reminderTimes(now = Date.now()) {
+  const dates = new Set();
+  for (let offset = 0; offset < reminderWindowDays; offset++) {
+    const date = addDays(TODAY(), offset);
+    for (const task of instOn(date)) {
+      const time = String(task.time || '').match(/^(\d{1,2}):([0-5]\d)$/);
+      if (!time || +time[1] > 23 || task.done || graphReadiness(task, date).blocked) continue;
+      const due = fromIso(task.date);
+      due.setHours(+time[1], +time[2], 0, 0);
+      if (+due > now) dates.add(+due);
+    }
+  }
+  return [...dates].sort((a, b) => a - b).slice(0, 256);
+}
+
+async function reminderRequest(path, options) {
+  const response = await fetch(REMINDER_SERVICE_URL + path, options);
+  if (!response.ok) throw new Error('Reminder service unavailable');
+  return response.json();
+}
+
+function syncAndroidReminders() {
+  if (!androidReminders || !REMINDER_SERVICE_URL) return Promise.resolve();
+  reminderSync = reminderSync.catch(() => {}).then(async () => {
+    const token = localStorage.getItem(reminderKey);
+    if (!token || Notification.permission !== 'granted') return;
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (!subscription) throw new Error('Push subscription unavailable');
+    await reminderRequest('/schedule', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + token},
+      body: JSON.stringify({subscription: subscription.toJSON(), times: reminderTimes()}),
+    });
+    reminderStatus.textContent = 'یادآورهای اندروید فعال‌اند.';
+    reminderButton.textContent = 'خاموش کردن یادآور';
+  }).catch(() => {
+    reminderStatus.textContent = 'همگام‌سازی یادآورها انجام نشد. اتصال را بررسی کن.';
+    throw new Error('Reminder sync failed');
+  });
+  return reminderSync;
+}
+
+if (androidReminders && REMINDER_SERVICE_URL) {
+  reminderButton.hidden = false;
+  if (localStorage.getItem(reminderKey)) reminderButton.textContent = 'خاموش کردن یادآور';
+  reminderButton.onclick = async () => {
+    reminderButton.disabled = true;
+    try {
+      const token = localStorage.getItem(reminderKey);
+      if (!token && await Notification.requestPermission() !== 'granted') {
+        reminderStatus.textContent = 'برای دریافت یادآور، اجازهٔ اعلان را فعال کن.';
+        return;
+      }
+      const registration = await navigator.serviceWorker.ready;
+      if (token) {
+        await reminderSync.catch(() => {});
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) await subscription.unsubscribe();
+        localStorage.removeItem(reminderKey);
+        reminderButton.textContent = 'فعال کردن یادآور اندروید';
+        reminderStatus.textContent = 'یادآورها خاموش شدند.';
+        await reminderRequest('/schedule', {method:'DELETE', headers:{Authorization:'Bearer ' + token}});
+      } else {
+        const {publicKey} = await reminderRequest('/key');
+        const bytes = Uint8Array.from(atob(publicKey.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+        await registration.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: bytes});
+        localStorage.setItem(reminderKey, crypto.randomUUID() + crypto.randomUUID());
+        await syncAndroidReminders();
+      }
+    } catch {
+      reminderStatus.textContent = 'ارتباط با سرویس یادآور برقرار نشد.';
+    } finally {
+      reminderButton.disabled = false;
+    }
+  };
+  const sync = () => { syncAndroidReminders().catch(() => {}); };
+  window.addEventListener('online', sync);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
+  window.addEventListener('storage', event => { if (event.key === KEY) sync(); });
+}
+render();
