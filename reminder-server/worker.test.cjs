@@ -14,7 +14,11 @@ test('a Cloudflare alarm sends once and advances to the next reminder', async ()
     Date: {now: () => now},
     DurableObject: class { constructor(ctx, env) { this.ctx = ctx; this.env = env; } },
     webPush: {generateRequestDetails: subscription => ({endpoint:subscription.endpoint, method:'POST'})},
-    fetch: async () => { delivered++; return new Response(null, {status:201}); },
+    fetch: async (_, options) => {
+      assert.equal(options.redirect, 'manual');
+      delivered++;
+      return new Response(null, {status:201});
+    },
   });
   vm.runInContext(source, context);
   const storage = {

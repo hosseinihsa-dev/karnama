@@ -103,19 +103,23 @@ export class ReminderDevice extends DurableObject {
     const due = schedule.pending[0];
     if (due === undefined || due - now > leadMs) return this.store(schedule);
     const {VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY} = this.env;
-    const details = webPush.generateRequestDetails(schedule.subscription, JSON.stringify({due}), {
-      vapidDetails:{subject:VAPID_SUBJECT, publicKey:VAPID_PUBLIC_KEY, privateKey:VAPID_PRIVATE_KEY},
-      TTL:Math.ceil((due-now)/1000), urgency:'high',
-    });
     let response;
     try {
+      const details = webPush.generateRequestDetails(schedule.subscription, JSON.stringify({due}), {
+        vapidDetails:{subject:VAPID_SUBJECT, publicKey:VAPID_PUBLIC_KEY, privateKey:VAPID_PRIVATE_KEY},
+        TTL:Math.ceil((due-now)/1000), urgency:'high',
+      });
       const headers = new Headers(details.headers);
       headers.delete('Content-Length');
       response = await fetch(details.endpoint, {
-        method:details.method, headers, body:details.body, redirect:'error',
+        method:details.method, headers, body:details.body, redirect:'manual',
         signal:AbortSignal.timeout(5000),
       });
-    } catch {}
+      console.log('push response', response.status);
+    } catch (error) {
+      console.error('push request failed', error.name, error.code || '',
+        String(error.message || '').replace(/https?:\/\/\S+/g, '[url]'));
+    }
     const latest = await storage.get('schedule');
     if (!latest || latest.subscription.endpoint !== schedule.subscription.endpoint) return;
     if (response && [404,410].includes(response.status)) return this.store({pending:[], sent:[]});

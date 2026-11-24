@@ -3,6 +3,9 @@ main = "worker.js"
 compatibility_date = "2026-11-24"
 compatibility_flags = ["nodejs_compat"]
 
+[observability]
+enabled = true
+
 [vars]
 APP_ORIGIN = "https://hosseinihsa-dev.github.io"
 
