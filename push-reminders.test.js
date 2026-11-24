@@ -25,9 +25,10 @@ test('Android schedule contains future task times without task text', () => {
 
 test('the service worker can display the reminder without an open page', async () => {
   const handlers = {};
-  let notification, completion;
+  let notification, completion, receipt;
   const context = vm.createContext({
-    URL, Intl, Date,
+    URL, Intl, Date, Response,
+    caches:{open:async()=>({put:async (_, response)=>{ receipt = await response.json(); }})},
     self:{
       addEventListener:(name,fn)=>{ handlers[name]=fn; },
       registration:{
@@ -42,4 +43,5 @@ test('the service worker can display the reminder without an open page', async (
   assert.equal(notification[0], 'کارنما');
   assert.match(notification[1].body, /۱۵ دقیقه/);
   assert.equal(notification[1].data.page, 'https://example.com/karnama/index.html');
+  assert.equal(receipt.displayed, true);
 });

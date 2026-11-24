@@ -999,6 +999,20 @@ function syncAndroidReminders() {
         : status === 404 || status === 410 ? 'اشتراک منقضی شده؛ یادآور را خاموش و دوباره فعال کن.'
         : status ? `پاسخ گوگل ${status} بود.` : 'ارتباط با گوگل برقرار نشد.';
       message += ` ${prefix} ـ ${outcome}`;
+      if (status >= 200 && status < 300) {
+        try {
+          const cached = await caches.match(new URL('./__push-receipt', registration.scope));
+          const receipt = cached && await cached.json();
+          if (receipt?.due === diagnostic.due) {
+            message += receipt.displayed ? ' Chrome اعلان را به اندروید سپرد.'
+              : ` Chrome پیام را گرفت ولی نمایش اعلان خطا داد (${receipt.error}).`;
+          } else {
+            message += ' رسید دریافت پیام در Chrome ثبت نشده است.';
+          }
+        } catch {
+          message += ' خواندن رسید دستگاه ممکن نشد.';
+        }
+      }
     }
     reminderStatus.textContent = message;
     reminderButton.textContent = 'خاموش کردن یادآور';
