@@ -38,6 +38,10 @@ function render(){
   const v=document.getElementById('view');
   const pages={0:advisorHome,1:tomorrowView,2:weekView,3:monthView,4:catView,5:studyView,6:plannerPage,7:tasksView,8:graphView};
   v.innerHTML=(pages[S.tab]||advisorHome)(overdue,list,doneN,today);
+  const upcomingDetails=v.querySelector('#advisor-next-tasks');
+  if(upcomingDetails)upcomingDetails.addEventListener('toggle',()=>{
+    try{localStorage.setItem('karnama.advisor-next-tasks',String(upcomingDetails.open))}catch{}
+  });
   v.querySelectorAll('[data-act]').forEach(el=>{
     el.onclick=()=>{
       const id=+el.dataset.id,a=el.dataset.act;
@@ -125,8 +129,7 @@ function advisorCountdownMarkup(target,upcoming=false){
   return `<p class="advisor-countdown"><span>${target.deadline?'تا پایان مهلت':'تا زمان انجام'}</span><bdi id="advisor-countdown" data-at="${target.at}" data-deadline="${target.deadline}" data-upcoming="${upcoming}">${advisorCountdownText(target.at,target.deadline)}</bdi></p>`;
 }
 
-function advisorWaitingCard(today,nowMin){
-  const upcoming=advisorUpcomingTask(today,nowMin);
+function advisorWaitingCard(today,nowMin,upcoming=advisorUpcomingTask(today,nowMin)){
   const allTasks='<button class="primary" data-act="allTasks" data-id="0">دیدن کارهای ثبت‌شده</button>';
   if(upcoming){
     const target=advisorCountdownTarget({date:upcoming.date,time:upcoming.time});
@@ -141,13 +144,53 @@ function advisorWaitingCard(today,nowMin){
   return `<div class="advisor-proposal empty"><h2>فعلاً کاری آمادهٔ انجام نیست</h2><p>${detail}</p>${hasTasks?`<div>${allTasks}</div>`:''}</div>`;
 }
 
+function advisorFollowingTasks(today, list, overdue, featured){
+  const next=[...overdue,...list.filter(task=>!task.done)];
+  const todayIds=new Set(next.map(task=>task.id));
+  const tomorrow=addDays(today,1);
+  for(const task of tasksInSpace()){
+    if(!task.rep){
+      if(!task.done&&task.date>today)next.push(task);
+      continue;
+    }
+    if(todayIds.has(task.id))continue;
+    let date=task.date>tomorrow?task.date:tomorrow;
+    for(let offset=0;offset<62&&(!task.until||date<=task.until);offset++,date=addDays(date,1)){
+      const occurrences=instOn(date,[task]).filter(item=>!item.done);
+      if(occurrences.length){next.push(...occurrences);break}
+    }
+  }
+  const featuredKey=featured&&decisionKey(featured);
+  return next.filter(task=>decisionKey(task)!==featuredKey)
+    .sort((a,b)=>a.date.localeCompare(b.date)||bySlot(a,b));
+}
+
+function advisorFollowingList(today,list,overdue,featured){
+  const tasks=advisorFollowingTasks(today,list,overdue,featured);
+  let open=false;
+  try{open=localStorage.getItem('karnama.advisor-next-tasks')==='true'}catch{}
+  let previousDate;
+  const cards=tasks.map((task,index)=>{
+    const date=task.date;
+    const heading=date!==previousDate
+      ?`<h3>${date===today?'امروز':fa(jdate(date))}</h3>`:'';
+    previousDate=date;
+    return heading+taskCard(task,index);
+  }).join('');
+  return `<details id="advisor-next-tasks" class="advisor-next-tasks"${open?' open':''}>
+    <summary>کارهای بعدی <span>${fa(tasks.length)}</span></summary>
+    <div class="list">${cards||'<p class="empty">کار دیگری در این فضا ثبت نشده است.</p>'}</div>
+  </details>`;
+}
+
 function advisorHome(overdue,list,doneN,today){
   const x=chooseAdvisorTask(today);
   if(x)recordSuggestedBehavior(x.task,x);
   const target=x&&advisorCountdownTarget(x.task);
   const countdown=advisorCountdownMarkup(target);
-  const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2>${domainChip(x.task)} ${x.task.time?`<time class="chip c-nu" datetime="${esc(x.task.time)}">ساعت <bdi>${esc(fa(x.task.time))}</bdi></time>`:''}${countdown}<div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionDone" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">✓ انجام شد</button></div></div>`:advisorWaitingCard(today);
-  return `<section class="coach-home"><div class="coach-orb"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 7c6 0 10 3 13 8 3-5 7-8 13-8v7c-6 0-9 4-9 10v10h-8V24c0-6-3-10-9-10z"/></svg></div><h2 class="coach-question">قدم بعدی امروز</h2>${proposal}<button class="home-add-task" data-act="addTask" data-id="0"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>افزودن کار</span></button></section>`;
+  const upcoming=x?null:advisorUpcomingTask(today);
+  const proposal=x?`<div class="advisor-proposal"><span>پیشنهاد الآن</span><h2>${esc(x.task.title)}</h2>${domainChip(x.task)} ${x.task.time?`<time class="chip c-nu" datetime="${esc(x.task.time)}">ساعت <bdi>${esc(fa(x.task.time))}</bdi></time>`:''}${countdown}<div><button data-act="decisionReject" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">الان نمی‌تونم</button><button class="primary" data-act="decisionDone" data-id="${x.task.id}" data-key="${esc(decisionKey(x.task))}">✓ انجام شد</button></div></div>`:advisorWaitingCard(today,undefined,upcoming);
+  return `<section class="coach-home"><div class="coach-orb"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 7c6 0 10 3 13 8 3-5 7-8 13-8v7c-6 0-9 4-9 10v10h-8V24c0-6-3-10-9-10z"/></svg></div><h2 class="coach-question">قدم بعدی امروز</h2>${proposal}${advisorFollowingList(today,list,overdue,x?.task||upcoming)}<button class="home-add-task" data-act="addTask" data-id="0"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>افزودن کار</span></button></section>`;
 }
 
 function tasksView(overdue,list,doneN,today){
@@ -986,7 +1029,7 @@ function syncAndroidReminders() {
       times.sort((a,b) => a-b);
       times.length = Math.min(times.length, 256);
     }
-    const cache = await caches.open('karnama-v83');
+    const cache = await caches.open('karnama-v84');
     await cache.put(new URL('./__push-titles', registration.scope), Response.json(Object.fromEntries(tasks)));
     const result = await reminderRequest('/schedule', {
       method: 'PUT',

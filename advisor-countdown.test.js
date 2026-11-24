@@ -45,3 +45,7 @@ assert.equal(check("advisorUpcomingTask(today,945).id"),50);
 assert.match(check("advisorWaitingCard(today,945)"),/جلسهٔ انبارداری.*data-upcoming="true".*دیدن کارهای ثبت‌شده/);
 assert.equal(check("advisorUpcomingTask(today,960).id"),52);
 assert.equal(check("chooseNextTask(tasksInSpace(),today,960).task.id"),50);
+assert.equal(check(`
+  S.tasks.push({...meeting,id:53,date:addDays(today,2)}, {...meeting,id:54,done:true});
+  advisorFollowingTasks(today,instOn(today,tasksInSpace()),[],meeting).map(task=>task.id).join(',')
+`), '52,53');

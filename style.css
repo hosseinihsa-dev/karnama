@@ -355,3 +355,9 @@ body.work-space nav button[data-tab="5"],body.work-space #menu-study{display:non
 
 .advisor-proposal .advisor-countdown{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px}
 .advisor-countdown bdi{color:#e3efc5;font-size:1.1rem;font-weight:750;font-variant-numeric:tabular-nums}
+.advisor-next-tasks{width:100%;max-width:460px;margin:16px 0 24px}
+.advisor-next-tasks>summary{min-height:48px;padding:12px 14px;border:1px solid #353842;border-radius:14px;background:#1d2024;cursor:pointer;font-weight:700}
+.advisor-next-tasks>summary span{margin-inline-start:8px;color:#b9e633}
+.advisor-next-tasks>summary:focus-visible{outline:2px solid #b9e633;outline-offset:2px}
+.advisor-next-tasks .list{margin-top:8px}
+.advisor-next-tasks h3{margin:10px 2px 2px;font-size:.85rem;color:#b7bab7}
